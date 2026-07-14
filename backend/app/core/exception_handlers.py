@@ -26,14 +26,20 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def handle_validation_error(
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
-        del request
         first_error = exc.errors()[0] if exc.errors() else None
         detail = (
             first_error.get("msg", "입력값이 올바르지 않습니다.")
             if first_error
             else "입력값이 올바르지 않습니다."
         )
-        return error_response(422, str(detail), "INVALID_QUERY_PARAMETER")
+
+        code = (
+            "INVALID_POST_INPUT"
+            if request.url.path.startswith("/api/posts")
+            and request.method in {"POST", "PUT", "DELETE"}
+            else "INVALID_QUERY_PARAMETER"
+        )
+        return error_response(422, str(detail), code)
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_exception(
