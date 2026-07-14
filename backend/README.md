@@ -57,3 +57,19 @@ backend/
 ## Render
 
 저장소 루트의 `render.yaml`은 백엔드 root directory, `/api/health`, SQLite persistent disk를 설정합니다. persistent disk가 필요한 구성이라 유료 Starter 플랜을 기준으로 하며, `ALLOWED_ORIGINS`와 `OPENAI_API_KEY`는 Render에서 직접 입력합니다.
+
+앱 시작 시 `locations`가 정확히 6,518건인지 확인하고, 비어 있거나 불완전하면 `data/locations`의 원본 JSON 7종을 `/var/data/localhub.db`에 자동 적재합니다. 로컬에서 직접 실행하려면 다음 명령을 사용합니다.
+
+```powershell
+python -m scripts.seed_locations
+```
+
+## 데이터 출처
+
+이 서비스는 한국관광공사 Tour API(TourAPI 4.0)의 데이터를 활용하였습니다.
+
+- 출처: 한국관광공사
+- 원본 API: https://www.data.go.kr/data/15101578/openapi.do
+- 라이선스: 공공누리 제3유형(출처 표시·변경 금지)
+
+원본 JSON은 수정하지 않으며, 서비스용 정규화 값과 함께 각 원본 객체를 `raw_json`에 보존합니다. 원천 좌표가 서울 범위를 벗어난 항목은 원본을 유지하되 지도·주변 추천용 좌표를 `NULL`로 저장합니다.
