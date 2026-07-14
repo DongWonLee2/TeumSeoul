@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,13 +10,19 @@ from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging
 from app.db.init_db import init_db
+from app.db.session import SessionLocal
 from app.schemas.common import ErrorResponse
+from app.services.location import seed_locations_if_needed
+
+LOCATION_DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "locations"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     del app
     init_db()
+    with SessionLocal() as db:
+        seed_locations_if_needed(db, LOCATION_DATA_DIR)
     yield
 
 
