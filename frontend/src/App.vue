@@ -1,7 +1,43 @@
 <script setup>
-import HelloWorld from './components/HelloWorld.vue'
+import { computed, ref } from 'vue'
+import AppHeader from './components/AppHeader.vue'
+import PlaceModal from './components/PlaceModal.vue'
+import HomeView from './views/HomeView.vue'
+import MapView from './views/MapView.vue'
+import { PLACES } from './data/places.js'
+
+const currentView = ref('home')
+const selectedPlaceId = ref(null)
+
+const selectedPlace = computed(() =>
+  PLACES.find((place) => place.id === selectedPlaceId.value),
+)
+
+function openPlace(place) {
+  selectedPlaceId.value = place.id
+}
 </script>
 
 <template>
-  <HelloWorld />
+  <div class="app-shell">
+    <AppHeader :current-view="currentView" @navigate="currentView = $event" />
+
+    <HomeView
+      v-if="currentView === 'home'"
+      @open-place="openPlace"
+      @show-map="currentView = 'map'"
+    />
+    <MapView v-else-if="currentView === 'map'" @open-place="openPlace" />
+
+    <section v-else class="coming-soon">
+      <h1>커뮤니티</h1>
+      <p>커뮤니티 화면은 팀원이 작업 중입니다.</p>
+    </section>
+
+    <PlaceModal
+      v-if="selectedPlace"
+      :place="selectedPlace"
+      @close="selectedPlaceId = null"
+    />
+  </div>
 </template>
