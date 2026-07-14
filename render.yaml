@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: teumseoul-api
+    runtime: python
+    plan: starter
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: TEUMSEOUL_APP_ENV
+        value: production
+      - key: TEUMSEOUL_DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        value: sqlite:////var/data/localhub.db
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-5-mini
+    disk:
+      name: teumseoul-data
+      mountPath: /var/data
+      sizeGB: 1
+
