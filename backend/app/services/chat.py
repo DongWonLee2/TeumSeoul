@@ -371,7 +371,8 @@ def generate_ai_output(
             {"role": "user", "content": prompt_payload},
         ],
         text_format=AIChatOutput,
-        max_output_tokens=1200,
+        reasoning={"effort": "low"},
+        max_output_tokens=3000,
         store=False,
     )
     if response.output_parsed is None:
