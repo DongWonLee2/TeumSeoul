@@ -1,15 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import MapView from '../views/MapView.vue'
-
-const CommunityPlaceholder = {
-  template: `
-    <section class="coming-soon">
-      <h1>커뮤니티</h1>
-      <p>커뮤니티 화면은 팀원이 작업 중입니다.</p>
-    </section>
-  `,
-}
+import CommunityView from '../views/CommunityView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -31,7 +23,7 @@ const router = createRouter({
     {
       path: '/community',
       name: 'community',
-      component: CommunityPlaceholder,
+      component: CommunityView,
       meta: { section: 'community' },
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },
