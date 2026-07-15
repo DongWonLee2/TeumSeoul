@@ -31,13 +31,13 @@ defineEmits(['update:searchQuery', 'select-category', 'select-district'])
       </button>
       <button
         v-for="category in categories"
-        :key="category.key"
+        :key="category.id"
         type="button"
         class="filter-chip category-chip"
-        :class="{ active: activeCategory === category.key }"
-        @click="$emit('select-category', category.key)"
+        :class="{ active: activeCategory === category.id }"
+        @click="$emit('select-category', category.id)"
       >
-        {{ category.label }}
+        {{ category.name }}
       </button>
     </div>
 
