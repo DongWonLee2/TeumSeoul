@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getLocationDetail } from '../api/locations.js'
+import { getPosts } from '../api/posts.js'
 import { CATEGORIES } from '../data/places.js'
 import { getCategoryMeta } from '../utils/category.js'
 
@@ -13,8 +14,13 @@ const copyStatus = ref('idle')
 const nearbyPlaces = ref([])
 const nearbyLoading = ref(false)
 const nearbyError = ref('')
+const relatedPosts = ref([])
+const relatedPostTotal = ref(0)
+const relatedPostsLoading = ref(false)
+const relatedPostsError = ref('')
 let copyStatusTimer
 let nearbyController
+let relatedPostsController
 const meta = computed(() => getCategoryMeta(props.place.content_type_id))
 const currentImage = computed(() => props.place.image_url)
 const visibleWarnings = computed(() =>
@@ -60,6 +66,34 @@ function relatedPostDate(createdAt) {
     month: 'short',
     day: 'numeric',
   }).format(new Date(createdAt))
+}
+
+async function loadRelatedPosts() {
+  relatedPostsController?.abort()
+  relatedPosts.value = props.place.related_posts ?? []
+  relatedPostTotal.value = props.place.related_post_count ?? relatedPosts.value.length
+  relatedPostsError.value = ''
+
+  const currentController = new AbortController()
+  relatedPostsController = currentController
+  relatedPostsLoading.value = true
+  try {
+    const response = await getPosts({
+      locationId: props.place.id,
+      page: 1,
+      size: 100,
+      sort: 'recent',
+    }, currentController.signal)
+    if (relatedPostsController !== currentController) return
+    relatedPosts.value = response.data ?? []
+    relatedPostTotal.value = response.meta?.total_items ?? relatedPosts.value.length
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      relatedPostsError.value = '관련 게시글 전체 목록을 불러오지 못했어요.'
+    }
+  } finally {
+    if (relatedPostsController === currentController) relatedPostsLoading.value = false
+  }
 }
 
 async function loadNearbyPlaces() {
@@ -137,10 +171,12 @@ onMounted(() => {
 })
 
 watch(() => props.place.id, loadNearbyPlaces, { immediate: true })
+watch(() => props.place.id, loadRelatedPosts, { immediate: true })
 
 onBeforeUnmount(() => {
   window.clearTimeout(copyStatusTimer)
   nearbyController?.abort()
+  relatedPostsController?.abort()
   document.body.classList.remove('modal-open')
   window.removeEventListener('keydown', onKeydown)
 })
@@ -192,10 +228,16 @@ onBeforeUnmount(() => {
         </ul>
       </div>
       <section class="related-section" aria-labelledby="related-title">
-        <h2 id="related-title">관련 게시글 ({{ place.related_post_count ?? 0 }})</h2>
-        <div v-if="place.related_posts?.length" class="related-post-list">
+        <h2 id="related-title">관련 게시글 ({{ relatedPostTotal }})</h2>
+        <p v-if="relatedPostsError" class="related-post-error" role="status">{{ relatedPostsError }}</p>
+        <div
+          v-if="relatedPosts.length"
+          class="related-post-list"
+          :class="{ scrollable: relatedPosts.length > 3 }"
+          :aria-busy="relatedPostsLoading"
+        >
           <button
-            v-for="post in place.related_posts"
+            v-for="post in relatedPosts"
             :key="post.id"
             type="button"
             class="related-post-card"

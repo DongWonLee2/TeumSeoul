@@ -1,6 +1,6 @@
 import { apiRequest } from './client.js'
 
-export async function getPosts(params = {}) {
+export async function getPosts(params = {}, signal) {
   const query = new URLSearchParams()
 
   if (params.q) query.set('q', params.q)
@@ -13,7 +13,7 @@ export async function getPosts(params = {}) {
   if (params.size) query.set('size', String(params.size))
 
   const queryString = query.toString()
-  const response = await apiRequest(queryString ? `/posts?${queryString}` : '/posts')
+  const response = await apiRequest(queryString ? `/posts?${queryString}` : '/posts', { signal })
   return response
 }
 
