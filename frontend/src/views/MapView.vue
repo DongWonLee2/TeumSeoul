@@ -1,31 +1,37 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import FilterChips from '../components/FilterChips.vue'
 import LeafletMap from '../components/LeafletMap.vue'
 import PlaceCard from '../components/PlaceCard.vue'
-import { getMapLocations } from '../api/locations.js'
+import { getLocations, getMapLocations } from '../api/locations.js'
 
 defineProps({
   categories: { type: Array, required: true },
   districts: { type: Array, required: true },
 })
 
-defineEmits(['open-place'])
+const emit = defineEmits(['open-place'])
 
 const searchQuery = ref('')
 const activeCategory = ref('all')
 const activeDistrict = ref('all')
+const appliedSearchQuery = ref('')
+const appliedCategory = ref('all')
+const appliedDistrict = ref('all')
 const places = ref([])
 const mapMeta = ref({ count: 0, limit: 300, truncated: false })
 const mapBounds = ref(null)
 const loading = ref(false)
 const error = ref('')
+const fitRequest = ref(0)
+const focusedPlace = ref(null)
+const focusRequest = ref(0)
 let controller
 
 const visiblePlaces = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase()
+  const query = appliedSearchQuery.value.trim().toLowerCase()
   return places.value.filter((place) => {
-    const districtMatches = activeDistrict.value === 'all' || place.district === activeDistrict.value
+    const districtMatches = appliedDistrict.value === 'all' || place.district === appliedDistrict.value
     const queryMatches = !query
       || place.title.toLowerCase().includes(query)
       || (place.district || '').toLowerCase().includes(query)
@@ -42,14 +48,31 @@ async function loadMapPlaces() {
   error.value = ''
 
   try {
-    const response = await getMapLocations({
-      ...mapBounds.value,
-      content_type_ids: activeCategory.value === 'all' ? undefined : activeCategory.value,
-      limit: 300,
-    }, currentController.signal)
+    const useLocationSearch = Boolean(appliedSearchQuery.value.trim())
+      || appliedDistrict.value !== 'all'
+    const response = useLocationSearch
+      ? await getLocations({
+          q: appliedSearchQuery.value.trim(),
+          content_type_id: appliedCategory.value,
+          district: appliedDistrict.value,
+          page: 1,
+          size: 100,
+          sort: 'recent',
+        }, currentController.signal)
+      : await getMapLocations({
+          ...mapBounds.value,
+          content_type_ids: appliedCategory.value === 'all' ? undefined : appliedCategory.value,
+          limit: 300,
+        }, currentController.signal)
     if (controller !== currentController) return
     places.value = response.data
-    mapMeta.value = response.meta
+    mapMeta.value = useLocationSearch
+      ? {
+          count: response.data.length,
+          limit: response.meta?.size ?? 100,
+          truncated: (response.meta?.total_items ?? response.data.length) > response.data.length,
+        }
+      : response.meta
   } catch (requestError) {
     if (requestError.name === 'AbortError' || controller !== currentController) return
     places.value = []
@@ -61,10 +84,23 @@ async function loadMapPlaces() {
 
 function onBoundsChange(bounds) {
   mapBounds.value = bounds
+  if (appliedSearchQuery.value.trim() || appliedDistrict.value !== 'all') return
   loadMapPlaces()
 }
 
-watch(activeCategory, loadMapPlaces)
+async function applyFilters() {
+  appliedSearchQuery.value = searchQuery.value
+  appliedCategory.value = activeCategory.value
+  appliedDistrict.value = activeDistrict.value
+  await loadMapPlaces()
+  if (places.value.length) fitRequest.value += 1
+}
+
+function selectPlace(place) {
+  focusedPlace.value = place
+  focusRequest.value += 1
+  emit('open-place', place)
+}
 
 onBeforeUnmount(() => controller?.abort())
 </script>
@@ -78,6 +114,7 @@ onBeforeUnmount(() => controller?.abort())
     :active-district="activeDistrict"
     @select-category="activeCategory = $event"
     @select-district="activeDistrict = $event"
+    @search="applyFilters"
   />
 
   <main class="map-page">
@@ -98,9 +135,12 @@ onBeforeUnmount(() => controller?.abort())
       :places="visiblePlaces"
       :categories="categories"
       :loading="loading"
+      :fit-request="fitRequest"
+      :focus-place="focusedPlace"
+      :focus-request="focusRequest"
       height="min(640px, 70vh)"
       @bounds-change="onBoundsChange"
-      @open-place="$emit('open-place', $event)"
+      @open-place="selectPlace"
     />
 
     <div v-if="visiblePlaces.length" class="map-card-row">
@@ -109,7 +149,7 @@ onBeforeUnmount(() => controller?.abort())
         :key="place.id"
         :place="place"
         compact
-        @open="$emit('open-place', $event)"
+        @open="selectPlace"
       />
     </div>
     <div v-else-if="!loading && !error" class="empty-results map-empty">

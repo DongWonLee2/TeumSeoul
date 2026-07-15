@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import FilterChips from '../components/FilterChips.vue'
 import LeafletMap from '../components/LeafletMap.vue'
 import PlaceCard from '../components/PlaceCard.vue'
@@ -14,6 +14,9 @@ const emit = defineEmits(['open-place', 'show-map'])
 const searchQuery = ref('')
 const activeCategory = ref('all')
 const activeDistrict = ref('all')
+const appliedSearchQuery = ref('')
+const appliedCategory = ref('all')
+const appliedDistrict = ref('all')
 const places = ref([])
 const totalItems = ref(0)
 const listLoading = ref(false)
@@ -25,12 +28,11 @@ const mapLoading = ref(false)
 const mapError = ref('')
 let listController
 let mapController
-let searchTimer
 
 const visibleMapPlaces = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase()
+  const query = appliedSearchQuery.value.trim().toLowerCase()
   return mapPlaces.value.filter((place) => {
-    const districtMatches = activeDistrict.value === 'all' || place.district === activeDistrict.value
+    const districtMatches = appliedDistrict.value === 'all' || place.district === appliedDistrict.value
     const queryMatches = !query
       || place.title.toLowerCase().includes(query)
       || (place.district || '').toLowerCase().includes(query)
@@ -47,9 +49,9 @@ async function loadLocations() {
 
   try {
     const response = await getLocations({
-      q: searchQuery.value.trim(),
-      content_type_id: activeCategory.value,
-      district: activeDistrict.value,
+      q: appliedSearchQuery.value.trim(),
+      content_type_id: appliedCategory.value,
+      district: appliedDistrict.value,
       page: 1,
       size: 20,
       sort: 'recent',
@@ -78,7 +80,7 @@ async function loadMapPlaces() {
   try {
     const response = await getMapLocations({
       ...mapBounds.value,
-      content_type_ids: activeCategory.value === 'all' ? undefined : activeCategory.value,
+      content_type_ids: appliedCategory.value === 'all' ? undefined : appliedCategory.value,
       limit: 300,
     }, currentController.signal)
     if (mapController !== currentController) return
@@ -98,16 +100,17 @@ function onBoundsChange(bounds) {
   loadMapPlaces()
 }
 
-function scheduleListLoad() {
-  window.clearTimeout(searchTimer)
-  searchTimer = window.setTimeout(loadLocations, 300)
+function applyFilters() {
+  appliedSearchQuery.value = searchQuery.value
+  appliedCategory.value = activeCategory.value
+  appliedDistrict.value = activeDistrict.value
+  loadLocations()
+  loadMapPlaces()
 }
 
-watch([searchQuery, activeCategory, activeDistrict], scheduleListLoad, { immediate: true })
-watch(activeCategory, loadMapPlaces)
+onMounted(loadLocations)
 
 onBeforeUnmount(() => {
-  window.clearTimeout(searchTimer)
   listController?.abort()
   mapController?.abort()
 })
@@ -122,6 +125,7 @@ onBeforeUnmount(() => {
     :active-district="activeDistrict"
     @select-category="activeCategory = $event"
     @select-district="activeDistrict = $event"
+    @search="applyFilters"
   />
 
   <main class="home-layout">
@@ -138,7 +142,7 @@ onBeforeUnmount(() => {
       </div>
       <div v-else-if="places.length" class="place-list">
         <PlaceCard
-          v-for="place in places.slice(0, 2)"
+          v-for="place in places.slice(0, 4)"
           :key="place.id"
           :place="place"
           @open="$emit('open-place', $event)"

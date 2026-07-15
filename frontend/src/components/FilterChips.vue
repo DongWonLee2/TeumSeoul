@@ -7,18 +7,21 @@ defineProps({
   activeDistrict: { type: String, required: true },
 })
 
-defineEmits(['update:searchQuery', 'select-category', 'select-district'])
+defineEmits(['update:searchQuery', 'select-category', 'select-district', 'search'])
 </script>
 
 <template>
   <section class="filter-panel" aria-label="장소 검색 필터">
-    <input
-      :value="searchQuery"
-      type="search"
-      placeholder="장소, 지역, 축제 이름으로 검색"
-      aria-label="장소 검색"
-      @input="$emit('update:searchQuery', $event.target.value)"
-    />
+    <form class="filter-search" role="search" @submit.prevent="$emit('search')">
+      <input
+        :value="searchQuery"
+        type="search"
+        placeholder="장소, 지역, 축제 이름으로 검색"
+        aria-label="장소 검색"
+        @input="$emit('update:searchQuery', $event.target.value)"
+      />
+      <button type="submit" class="search-submit">검색</button>
+    </form>
 
     <div class="chip-row">
       <button
