@@ -8,7 +8,7 @@ const props = defineProps({
   place: { type: Object, required: true },
 })
 
-const emit = defineEmits(['close', 'open-place'])
+const emit = defineEmits(['close', 'open-place', 'open-post'])
 const copyStatus = ref('idle')
 const nearbyPlaces = ref([])
 const nearbyLoading = ref(false)
@@ -51,6 +51,15 @@ function distanceLabel(distanceKm) {
 function walkingTime(distanceKm) {
   if (!Number.isFinite(distanceKm)) return ''
   return `도보 ${Math.max(1, Math.round(distanceKm * 12.5))}분`
+}
+
+function relatedPostDate(createdAt) {
+  if (!createdAt) return ''
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(createdAt))
 }
 
 async function loadNearbyPlaces() {
@@ -182,10 +191,32 @@ onBeforeUnmount(() => {
           <li v-for="warning in visibleWarnings" :key="warning">{{ warning }}</li>
         </ul>
       </div>
-      <h2>관련 게시글 ({{ place.related_post_count ?? 0 }})</h2>
-      <div class="empty-related">
-        {{ place.related_post_count ? '관련 게시글은 API 연결 후 표시됩니다.' : '아직 등록된 게시글이 없어요.' }}
-      </div>
+      <section class="related-section" aria-labelledby="related-title">
+        <h2 id="related-title">관련 게시글 ({{ place.related_post_count ?? 0 }})</h2>
+        <div v-if="place.related_posts?.length" class="related-post-list">
+          <button
+            v-for="post in place.related_posts"
+            :key="post.id"
+            type="button"
+            class="related-post-card"
+            :aria-label="`${post.title} 게시글 보기`"
+            @click="$emit('open-post', post)"
+          >
+            <span class="related-post-main">
+              <span class="related-post-heading">
+                <span class="related-post-category">{{ post.category }}</span>
+                <strong>{{ post.title }}</strong>
+              </span>
+              <span class="related-post-meta">
+                <span v-if="post.status_tag" class="related-post-status">{{ post.status_tag }}</span>
+                <span>{{ relatedPostDate(post.created_at) }}</span>
+              </span>
+            </span>
+            <span class="related-post-chevron" aria-hidden="true">›</span>
+          </button>
+        </div>
+        <div v-else class="empty-related">아직 등록된 게시글이 없어요.</div>
+      </section>
       <section class="nearby-section" aria-labelledby="nearby-title">
         <div class="nearby-heading">
           <h2 id="nearby-title">근처 장소</h2>

@@ -39,6 +39,10 @@ function closePlace() {
   router.push({ name: currentView.value === 'map' ? 'map' : 'home' })
 }
 
+function openPost(post) {
+  router.push({ name: 'community', query: { post: post.id } })
+}
+
 async function loadPlaceDetail(id) {
   const requestId = ++detailRequestId
   selectedPlace.value = null
@@ -118,6 +122,7 @@ onMounted(async () => {
       :place="selectedPlace"
       @close="closePlace"
       @open-place="openPlace"
+      @open-post="openPost"
     />
   </div>
 </template>

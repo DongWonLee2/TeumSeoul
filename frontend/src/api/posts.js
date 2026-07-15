@@ -17,8 +17,8 @@ export async function getPosts(params = {}) {
   return response
 }
 
-export async function getPostDetail(postId) {
-  const response = await apiRequest(`/posts/${postId}`)
+export async function getPostDetail(postId, signal) {
+  const response = await apiRequest(`/posts/${postId}`, { signal })
   return response.data
 }
 
