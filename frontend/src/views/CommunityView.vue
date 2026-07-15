@@ -4,8 +4,13 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LeafletMap from '../components/LeafletMap.vue'
 import PostDetailView from './PostDetailView.vue'
-import { SEOUL_DISTRICTS, PLACES } from '../data/places.js'
+import { SEOUL_DISTRICTS } from '../data/places.js'
+import { getMapLocations } from '../api/locations.js'
 import { createPost, deletePost, getPostDetail, getPosts, updatePost } from '../api/posts.js'
+
+const props = defineProps({
+  categories: { type: Array, required: true },
+})
 
 const route = useRoute()
 const router = useRouter()
@@ -61,7 +66,9 @@ const draftBody = ref('')
 const draftPassword = ref('')
 const draftPlaceName = ref('')
 const selectedWritePlace = ref(null)
-const writePlaces = ref(PLACES.slice(0, 6))
+const writePlaces = ref([])
+const writeMapBounds = ref(null)
+const writeMapLoading = ref(false)
 const writeSubmitLabel = ref('등록')
 const titleLength = computed(() => draftTitle.value.trim().length)
 const bodyLength = computed(() => draftBody.value.trim().length)
@@ -195,6 +202,24 @@ function selectWriteCategory(key) {
 function handleWritePlaceSelect(place) {
   selectedWritePlace.value = place
   draftPlaceName.value = place.title
+}
+
+async function loadWriteMapPlaces() {
+  if (!writeMapBounds.value) return
+  writeMapLoading.value = true
+  try {
+    const response = await getMapLocations({ ...writeMapBounds.value, limit: 300 })
+    writePlaces.value = response.data
+  } catch (error) {
+    writePlaces.value = []
+  } finally {
+    writeMapLoading.value = false
+  }
+}
+
+function onWriteMapBoundsChange(bounds) {
+  writeMapBounds.value = bounds
+  loadWriteMapPlaces()
 }
 
 function formatPostTime(value) {
@@ -332,7 +357,9 @@ async function handlePostEdit(post) {
   draftBody.value = detail.content || ''
   draftPassword.value = ''
   draftPlaceName.value = detail.location?.title || ''
-  selectedWritePlace.value = detail.location ? PLACES.find((place) => place.id === detail.location.id) || null : null
+  selectedWritePlace.value = detail.location
+    ? { id: detail.location.id, title: detail.location.title, latitude: detail.location.latitude, longitude: detail.location.longitude }
+    : null
 }
 
 async function handlePostDelete(payload) {
@@ -364,7 +391,14 @@ onMounted(() => {
           <div class="community-write-map-card">
             <div class="community-write-map-tip">지도에서 장소를 선택하세요</div>
             <div class="community-write-map-shell">
-              <LeafletMap :places="writePlaces" height="280px" @open-place="handleWritePlaceSelect" />
+              <LeafletMap
+                :places="writePlaces"
+                :categories="props.categories"
+                :loading="writeMapLoading"
+                height="280px"
+                @bounds-change="onWriteMapBoundsChange"
+                @open-place="handleWritePlaceSelect"
+              />
             </div>
           </div>
 
