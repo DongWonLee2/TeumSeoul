@@ -1,8 +1,13 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import LeafletMap from '../components/LeafletMap.vue'
 import PostDetailView from './PostDetailView.vue'
 import { SEOUL_DISTRICTS, PLACES } from '../data/places.js'
+import { getPostDetail } from '../api/posts.js'
+
+const route = useRoute()
+const router = useRouter()
 
 const WRITE_STATUS_TAGS = [
   { label: '혼잡', key: 'crowded' },
@@ -66,6 +71,9 @@ const isWrite = ref(false)
 const isEditing = ref(false)
 const editingPostId = ref(null)
 const selectedPost = ref(null)
+const postLoading = ref(false)
+const postError = ref('')
+let postRequestController
 const selectedCategory = ref('all')
 const selectedDistrict = ref('all')
 const communitySearchQuery = ref('')
@@ -108,8 +116,55 @@ function goWrite() {
 function backToCommunity() {
   isWrite.value = false
   selectedPost.value = null
+  postError.value = ''
+  if (route.query.post) router.replace({ name: 'community' })
   resetDraft()
 }
+
+function normalizeApiPost(post) {
+  return {
+    id: post.id,
+    category: post.category,
+    title: post.title,
+    body: post.content,
+    author: '익명',
+    time: post.created_at
+      ? new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(post.created_at))
+      : '',
+    views: post.view_count,
+    placeName: post.location?.title || '장소 미지정',
+    statusTags: post.status_tag ? [post.status_tag] : [],
+  }
+}
+
+async function loadPostFromRoute(postId) {
+  postRequestController?.abort()
+  if (!postId) {
+    postLoading.value = false
+    postError.value = ''
+    return
+  }
+  const currentController = new AbortController()
+  postRequestController = currentController
+  selectedPost.value = null
+  postError.value = ''
+  postLoading.value = true
+
+  try {
+    const post = await getPostDetail(postId, currentController.signal)
+    if (postRequestController === currentController) selectedPost.value = normalizeApiPost(post)
+  } catch (error) {
+    if (error.name !== 'AbortError' && postRequestController === currentController) {
+      postError.value = error.message || '게시글을 불러오지 못했습니다.'
+    }
+  } finally {
+    if (postRequestController === currentController) postLoading.value = false
+  }
+}
+
+watch(() => route.query.post, loadPostFromRoute, { immediate: true })
+
+onBeforeUnmount(() => postRequestController?.abort())
 
 function resetDraft() {
   isEditing.value = false
@@ -315,6 +370,17 @@ function submitPost() {
 
           <button class="community-submit-btn" type="button" @click="submitPost">{{ writeSubmitLabel }}</button>
         </div>
+      </div>
+    </template>
+
+    <template v-else-if="postLoading">
+      <div class="community-post-state" role="status">게시글을 불러오는 중…</div>
+    </template>
+
+    <template v-else-if="postError">
+      <div class="community-post-state error" role="alert">
+        <strong>{{ postError }}</strong>
+        <button type="button" @click="backToCommunity">커뮤니티로 돌아가기</button>
       </div>
     </template>
 
