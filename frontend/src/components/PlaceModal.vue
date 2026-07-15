@@ -1,14 +1,20 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { getLocationDetail } from '../api/locations.js'
+import { CATEGORIES } from '../data/places.js'
 import { getCategoryMeta } from '../utils/category.js'
 
 const props = defineProps({
   place: { type: Object, required: true },
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'open-place'])
 const copyStatus = ref('idle')
+const nearbyPlaces = ref([])
+const nearbyLoading = ref(false)
+const nearbyError = ref('')
 let copyStatusTimer
+let nearbyController
 const meta = computed(() => getCategoryMeta(props.place.content_type_id))
 const currentImage = computed(() => props.place.image_url)
 const visibleWarnings = computed(() =>
@@ -19,6 +25,65 @@ const photoStyle = computed(() => ({
     ? `url(${currentImage.value})`
     : `repeating-linear-gradient(45deg, ${meta.value.bg} 0 10px, ${meta.value.stripe} 10px 20px)`,
 }))
+
+function nearbyMeta(place) {
+  const category = CATEGORIES.find((item) => item.name === place.content_type)
+  return getCategoryMeta(place.content_type_id ?? category?.id)
+}
+
+function nearbyPhotoStyle(place) {
+  const category = nearbyMeta(place)
+  const imageUrl = place.thumbnail_url || place.image_url
+  return {
+    backgroundImage: imageUrl
+      ? `url(${imageUrl})`
+      : `repeating-linear-gradient(45deg, ${category.bg} 0 8px, ${category.stripe} 8px 16px)`,
+  }
+}
+
+function distanceLabel(distanceKm) {
+  if (!Number.isFinite(distanceKm)) return '거리 정보 없음'
+  return distanceKm < 1
+    ? `${Math.round(distanceKm * 1000).toLocaleString()}m`
+    : `${distanceKm.toFixed(1)}km`
+}
+
+function walkingTime(distanceKm) {
+  if (!Number.isFinite(distanceKm)) return ''
+  return `도보 ${Math.max(1, Math.round(distanceKm * 12.5))}분`
+}
+
+async function loadNearbyPlaces() {
+  nearbyController?.abort()
+  const sourcePlaces = (props.place.nearby_locations ?? []).slice(0, 4)
+  nearbyPlaces.value = sourcePlaces
+  nearbyError.value = ''
+  if (!sourcePlaces.length) return
+
+  const currentController = new AbortController()
+  nearbyController = currentController
+  nearbyLoading.value = true
+
+  try {
+    const results = await Promise.allSettled(
+      sourcePlaces.map((place) => getLocationDetail(place.id, currentController.signal)),
+    )
+    if (nearbyController !== currentController) return
+    nearbyPlaces.value = sourcePlaces.map((place, index) => (
+      results[index].status === 'fulfilled'
+        ? { ...place, ...results[index].value, distance_km: place.distance_km }
+        : place
+    ))
+  } catch (error) {
+    if (error.name !== 'AbortError') nearbyError.value = '근처 장소의 이미지를 불러오지 못했습니다.'
+  } finally {
+    if (nearbyController === currentController) nearbyLoading.value = false
+  }
+}
+
+function openNearbyPlace(place) {
+  emit('open-place', place)
+}
 
 function fallbackCopy(text) {
   const textarea = document.createElement('textarea')
@@ -62,8 +127,11 @@ onMounted(() => {
   window.addEventListener('keydown', onKeydown)
 })
 
+watch(() => props.place.id, loadNearbyPlaces, { immediate: true })
+
 onBeforeUnmount(() => {
   window.clearTimeout(copyStatusTimer)
+  nearbyController?.abort()
   document.body.classList.remove('modal-open')
   window.removeEventListener('keydown', onKeydown)
 })
@@ -118,6 +186,43 @@ onBeforeUnmount(() => {
       <div class="empty-related">
         {{ place.related_post_count ? '관련 게시글은 API 연결 후 표시됩니다.' : '아직 등록된 게시글이 없어요.' }}
       </div>
+      <section class="nearby-section" aria-labelledby="nearby-title">
+        <div class="nearby-heading">
+          <h2 id="nearby-title">근처 장소</h2>
+          <span>반경 1km</span>
+        </div>
+        <p v-if="nearbyError" class="nearby-error" role="status">{{ nearbyError }}</p>
+        <div v-if="nearbyPlaces.length" class="nearby-grid" :aria-busy="nearbyLoading">
+          <button
+            v-for="nearby in nearbyPlaces"
+            :key="nearby.id"
+            type="button"
+            class="nearby-card"
+            :aria-label="`${nearby.title} 상세 보기`"
+            @click="openNearbyPlace(nearby)"
+          >
+            <span class="nearby-photo" :style="nearbyPhotoStyle(nearby)">
+              <span v-if="!nearby.thumbnail_url && !nearby.image_url">PHOTO</span>
+            </span>
+            <span class="nearby-info">
+              <span
+                class="category-badge"
+                :style="{ background: nearbyMeta(nearby).bg, color: nearbyMeta(nearby).fg }"
+              >
+                {{ nearby.content_type }}
+              </span>
+              <span class="nearby-distance">
+                {{ walkingTime(nearby.distance_km) }} · {{ distanceLabel(nearby.distance_km) }}
+              </span>
+              <strong>{{ nearby.title }}</strong>
+            </span>
+            <span class="nearby-chevron" aria-hidden="true">›</span>
+          </button>
+        </div>
+        <div v-else class="nearby-empty">
+          등록된 근처 장소가 없어요.
+        </div>
+      </section>
     </article>
   </div>
 </template>

@@ -97,10 +97,15 @@ async function applyFilters() {
 }
 
 function selectPlace(place) {
-  focusedPlace.value = place
-  focusRequest.value += 1
   emit('open-place', place)
 }
+
+function focusSelectedPlace(place) {
+  focusedPlace.value = place
+  focusRequest.value += 1
+}
+
+defineExpose({ focusSelectedPlace })
 
 onBeforeUnmount(() => controller?.abort())
 </script>
