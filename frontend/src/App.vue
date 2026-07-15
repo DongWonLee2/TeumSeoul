@@ -3,8 +3,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import AppHeader from './components/AppHeader.vue'
 import PlaceModal from './components/PlaceModal.vue'
+
 import { getLocationDetail } from './api/locations.js'
 import { getHealth, getMeta } from './api/system.js'
+
 import { CATEGORIES, PLACES, SEOUL_DISTRICTS } from './data/places.js'
 
 const route = useRoute()
