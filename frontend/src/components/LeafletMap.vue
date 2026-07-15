@@ -50,22 +50,75 @@ function renderMarkers() {
   markerLayer.clearLayers()
   clusterLayer.clearLayers()
 
-  props.places
+  const validPlaces = props.places
     .filter((place) => Number.isFinite(place.latitude) && Number.isFinite(place.longitude))
-    .forEach((place) => {
+  const clusterIndexes = clusterEnabled.value && !courseMode.value
+    ? findClusterIndexes(validPlaces)
+    : new Set()
+  const clusteredMarkers = []
+
+  validPlaces.forEach((place, index) => {
     const marker = L.marker([place.latitude, place.longitude], { icon: markerIcon(place) })
       .bindTooltip(place.title, { direction: 'top', offset: [0, -24] })
       .on('click', () => emit('open-place', place))
-    if (clusterEnabled.value && !courseMode.value) clusterLayer.addLayer(marker)
+    if (clusterIndexes.has(index)) {
+      clusterLayer.addLayer(marker)
+      clusteredMarkers.push(marker)
+    }
     else markerLayer.addLayer(marker)
   })
+
+  const smallClusterMarkers = clusteredMarkers.filter((marker) => {
+    const visibleParent = clusterLayer.getVisibleParent(marker)
+    return typeof visibleParent?.getChildCount === 'function' && visibleParent.getChildCount() < 3
+  })
+  smallClusterMarkers.forEach((marker) => {
+    clusterLayer.removeLayer(marker)
+    markerLayer.addLayer(marker)
+  })
+}
+
+function findClusterIndexes(places) {
+  const parent = places.map((_, index) => index)
+  const points = places.map((place) => map.latLngToLayerPoint([place.latitude, place.longitude]))
+
+  function find(index) {
+    while (parent[index] !== index) {
+      parent[index] = parent[parent[index]]
+      index = parent[index]
+    }
+    return index
+  }
+
+  function union(a, b) {
+    const rootA = find(a)
+    const rootB = find(b)
+    if (rootA !== rootB) parent[rootB] = rootA
+  }
+
+  for (let i = 0; i < points.length; i += 1) {
+    for (let j = i + 1; j < points.length; j += 1) {
+      if (points[i].distanceTo(points[j]) <= 52) union(i, j)
+    }
+  }
+
+  const groupSizes = new Map()
+  places.forEach((_, index) => {
+    const root = find(index)
+    groupSizes.set(root, (groupSizes.get(root) || 0) + 1)
+  })
+
+  return new Set(
+    places.map((_, index) => index).filter((index) => groupSizes.get(find(index)) >= 3),
+  )
 }
 
 function syncVisibleLayer() {
   if (!map || !clusterLayer) return
   map.removeLayer(markerLayer)
   map.removeLayer(clusterLayer)
-  ;(clusterEnabled.value && !courseMode.value ? clusterLayer : markerLayer).addTo(map)
+  markerLayer.addTo(map)
+  if (clusterEnabled.value && !courseMode.value) clusterLayer.addTo(map)
 }
 
 function setClusterEnabled(enabled) {
@@ -113,9 +166,11 @@ onMounted(async () => {
   clusterLayer = L.markerClusterGroup({
     showCoverageOnHover: false,
     maxClusterRadius: 52,
-  }).addTo(map)
+  })
+  syncVisibleLayer()
   renderMarkers()
   map.on('moveend', emitBounds)
+  map.on('zoomend', renderMarkers)
   emitBounds()
 })
 

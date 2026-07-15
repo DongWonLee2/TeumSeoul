@@ -8,7 +8,7 @@ const props = defineProps({
   selectedCourseId: { type: [String, Number], default: null },
 })
 
-const emit = defineEmits(['select-course', 'clear-course', 'open-place'])
+const emit = defineEmits(['select-course', 'clear-course', 'open-place', 'results-change'])
 
 const mode = ref('nearby')
 const availableMinutes = ref(120)
@@ -108,9 +108,12 @@ async function submitRecommendation() {
   controller = currentController
   loading.value = true
   error.value = ''
+  emit('results-change', false)
   emit('clear-course')
   try {
-    result.value = await getSituationalRecommendations(buildPayload(), currentController.signal)
+    const response = await getSituationalRecommendations(buildPayload(), currentController.signal)
+    result.value = response
+    emit('results-change', Boolean(response?.data?.recommendations?.length))
   } catch (requestError) {
     if (requestError.name === 'AbortError') return
     if (requestError.status === 404) error.value = '조건에 맞는 코스를 찾지 못했어요. 조건을 바꿔 다시 시도해 주세요.'
@@ -124,6 +127,7 @@ async function submitRecommendation() {
 function resetResult() {
   result.value = null
   error.value = ''
+  emit('results-change', false)
   emit('clear-course')
 }
 

@@ -31,8 +31,11 @@ const selectedCourse = ref(null)
 const coursePlaces = ref([])
 const courseLoading = ref(false)
 const courseError = ref('')
+const recommendationResultsVisible = ref(false)
+const cardAddressCache = ref({})
 let controller
 let courseController
+const addressRequests = new Set()
 
 const visiblePlaces = computed(() => {
   const query = appliedSearchQuery.value.trim().toLowerCase()
@@ -46,8 +49,22 @@ const visiblePlaces = computed(() => {
 })
 
 const displayedPlaces = computed(() => selectedCourse.value ? coursePlaces.value : visiblePlaces.value)
+const displayedCardPlaces = computed(() => {
+  const isDefaultView = !selectedCourse.value
+    && !appliedSearchQuery.value.trim()
+    && appliedCategory.value === 'all'
+    && appliedDistrict.value === 'all'
 
-async function loadMapPlaces() {
+  if (!isDefaultView) return displayedPlaces.value
+  return [...displayedPlaces.value].sort((a, b) => String(b.source_modified_at || '')
+    .localeCompare(String(a.source_modified_at || '')))
+})
+const cardPlacesWithAddresses = computed(() => displayedCardPlaces.value.map((place) => ({
+  ...place,
+  address: place.address || cardAddressCache.value[place.id] || '',
+})))
+
+async function loadMapPlaces(useCurrentBounds = false) {
   if (!mapBounds.value) return
   controller?.abort()
   const currentController = new AbortController()
@@ -57,7 +74,7 @@ async function loadMapPlaces() {
 
   try {
     const useLocationSearch = Boolean(appliedSearchQuery.value.trim())
-      || appliedDistrict.value !== 'all'
+      || (appliedDistrict.value !== 'all' && !useCurrentBounds)
     const response = useLocationSearch
       ? await getLocations({
           q: appliedSearchQuery.value.trim(),
@@ -93,8 +110,8 @@ async function loadMapPlaces() {
 function onBoundsChange(bounds) {
   mapBounds.value = bounds
   if (selectedCourse.value) return
-  if (appliedSearchQuery.value.trim() || appliedDistrict.value !== 'all') return
-  loadMapPlaces()
+  if (appliedSearchQuery.value.trim()) return
+  loadMapPlaces(true)
 }
 
 async function applyFilters() {
@@ -157,6 +174,21 @@ function openRecommendedPlace(place) {
   selectPlace(detailedPlace || place)
 }
 
+async function loadCardAddress(place) {
+  if (place.address || cardAddressCache.value[place.id] || addressRequests.has(place.id)) return
+  addressRequests.add(place.id)
+  try {
+    const detail = await getLocationDetail(place.id)
+    if (detail.address) {
+      cardAddressCache.value = { ...cardAddressCache.value, [place.id]: detail.address }
+    }
+  } catch {
+    // 주소 보완 실패는 지도와 카드의 기본 동작에 영향을 주지 않습니다.
+  } finally {
+    addressRequests.delete(place.id)
+  }
+}
+
 function focusSelectedPlace(place) {
   focusedPlace.value = place
   focusRequest.value += 1
@@ -182,7 +214,10 @@ onBeforeUnmount(() => {
     @search="applyFilters"
   />
 
-  <main class="map-page recommendation-map-page">
+  <main
+    class="map-page recommendation-map-page"
+    :class="{ 'recommendation-results-visible': recommendationResultsVisible }"
+  >
     <section class="map-section">
     <div class="map-title">
       <h1>지도</h1>
@@ -194,7 +229,7 @@ onBeforeUnmount(() => {
     </p>
     <p v-if="error" class="map-notice error" role="alert">
       {{ error }}
-      <button type="button" @click="loadMapPlaces">다시 시도</button>
+      <button type="button" @click="loadMapPlaces()">다시 시도</button>
     </p>
     <p v-if="courseError" class="map-notice error" role="alert">{{ courseError }}</p>
 
@@ -212,11 +247,12 @@ onBeforeUnmount(() => {
 
     <div v-if="displayedPlaces.length" class="map-card-row">
       <PlaceCard
-        v-for="place in displayedPlaces.slice(0, 20)"
+        v-for="place in cardPlacesWithAddresses.slice(0, 20)"
         :key="place.id"
         :place="place"
         compact
         @open="selectPlace"
+        @need-address="loadCardAddress"
       />
     </div>
     <div v-else-if="!loading && !courseLoading && !error" class="empty-results map-empty">
@@ -231,6 +267,7 @@ onBeforeUnmount(() => {
       @select-course="selectCourse"
       @clear-course="clearSelectedCourse"
       @open-place="openRecommendedPlace"
+      @results-change="recommendationResultsVisible = $event"
     />
   </main>
 </template>
