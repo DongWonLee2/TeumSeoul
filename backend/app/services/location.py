@@ -18,9 +18,15 @@ from app.repositories.location import (
     find_location_by_id,
     find_locations,
     find_nearby_candidates,
+    find_related_posts,
 )
 from app.schemas.common import PaginationMeta
-from app.schemas.location import LocationDetail, LocationSummary, NearbyLocationSummary
+from app.schemas.location import (
+    LocationDetail,
+    LocationSummary,
+    NearbyLocationSummary,
+    RelatedPostSummary,
+)
 
 EXPECTED_CONTENT_TYPES = {
     12: ("관광지", 783),
@@ -40,6 +46,7 @@ UPSERT_BATCH_SIZE = 500
 NEARBY_RADIUS_KM = 3.0
 NEARBY_RESULT_LIMIT = 5
 NEARBY_CANDIDATE_LIMIT = 200
+RELATED_POST_LIMIT = 5
 EARTH_RADIUS_KM = 6371.0088
 
 
@@ -265,6 +272,11 @@ def get_location_detail(db: Session, location_id: int) -> LocationDetail:
         *summary.warnings,
         "운영시간은 제공 데이터에 없어 방문 전 확인이 필요합니다.",
     ]
+    related_posts, related_post_count = find_related_posts(
+        db,
+        location_id=location.id,
+        limit=RELATED_POST_LIMIT,
+    )
     return LocationDetail(
         **summary.model_dump(exclude={"warnings"}),
         thumbnail_url=location.thumbnail_url,
@@ -272,8 +284,8 @@ def get_location_detail(db: Session, location_id: int) -> LocationDetail:
         copyright_code=location.copyright_code,
         class_codes=_class_codes(location),
         warnings=detail_warnings,
-        related_post_count=0,
-        related_posts=[],
+        related_post_count=related_post_count,
+        related_posts=[RelatedPostSummary.model_validate(post) for post in related_posts],
         nearby_locations=_get_nearby_locations(db, location),
     )
 

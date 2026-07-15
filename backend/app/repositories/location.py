@@ -1,10 +1,12 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 
 from sqlalchemy import Select, extract, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.location import Location
+from app.models.post import Post
 
 
 @dataclass(frozen=True)
@@ -17,6 +19,15 @@ class LocationQuery:
     sort: Literal["recent", "title"] = "recent"
     page: int = 1
     size: int = 20
+
+
+@dataclass(frozen=True)
+class RelatedPostRecord:
+    id: int
+    title: str
+    category: str
+    status_tag: str | None
+    created_at: datetime
 
 
 def find_locations(db: Session, query: LocationQuery) -> tuple[list[Location], int]:
@@ -39,6 +50,29 @@ def find_locations(db: Session, query: LocationQuery) -> tuple[list[Location], i
 
 def find_location_by_id(db: Session, location_id: int) -> Location | None:
     return db.get(Location, location_id)
+
+
+def find_related_posts(
+    db: Session,
+    *,
+    location_id: int,
+    limit: int,
+) -> tuple[list[RelatedPostRecord], int]:
+    condition = Post.location_id == location_id
+    total = int(db.scalar(select(func.count()).select_from(Post).where(condition)) or 0)
+    rows = db.execute(
+        select(
+            Post.id,
+            Post.title,
+            Post.category,
+            Post.status_tag,
+            Post.created_at,
+        )
+        .where(condition)
+        .order_by(Post.created_at.desc(), Post.id.desc())
+        .limit(limit)
+    ).mappings()
+    return [RelatedPostRecord(**row) for row in rows], total
 
 
 def find_recommendation_candidates(
