@@ -22,9 +22,21 @@ let clusterLayer
 let map
 
 const mapStyle = computed(() => ({ minHeight: props.height }))
+const courseMode = computed(() => props.places.some((place) => place.courseOrder))
 
 function markerIcon(place) {
   const meta = getCategoryMeta(place.content_type_id)
+  if (place.courseOrder) {
+    return L.divIcon({
+      className: 'teum-course-marker-wrapper',
+      html: `<svg class="teum-course-marker" viewBox="0 0 36 44" aria-hidden="true">
+        <path d="M18 1.5C8.9 1.5 1.5 8.9 1.5 18c0 11.8 16.5 24.5 16.5 24.5S34.5 29.8 34.5 18C34.5 8.9 27.1 1.5 18 1.5Z" fill="${meta.dot}" stroke="white" stroke-width="3" stroke-linejoin="round"/>
+        <text x="18" y="23" text-anchor="middle" fill="white" font-size="14" font-weight="900" font-family="Noto Sans KR, sans-serif">${place.courseOrder}</text>
+      </svg>`,
+      iconSize: [36, 44],
+      iconAnchor: [18, 43],
+    })
+  }
   return L.divIcon({
     className: 'teum-marker-wrapper',
     html: `<span class="teum-marker" style="background:${meta.dot}"></span>`,
@@ -44,18 +56,23 @@ function renderMarkers() {
     const marker = L.marker([place.latitude, place.longitude], { icon: markerIcon(place) })
       .bindTooltip(place.title, { direction: 'top', offset: [0, -24] })
       .on('click', () => emit('open-place', place))
-    if (clusterEnabled.value) clusterLayer.addLayer(marker)
+    if (clusterEnabled.value && !courseMode.value) clusterLayer.addLayer(marker)
     else markerLayer.addLayer(marker)
   })
+}
+
+function syncVisibleLayer() {
+  if (!map || !clusterLayer) return
+  map.removeLayer(markerLayer)
+  map.removeLayer(clusterLayer)
+  ;(clusterEnabled.value && !courseMode.value ? clusterLayer : markerLayer).addTo(map)
 }
 
 function setClusterEnabled(enabled) {
   clusterEnabled.value = enabled
   if (!map) return
 
-  map.removeLayer(markerLayer)
-  map.removeLayer(clusterLayer)
-  ;(enabled ? clusterLayer : markerLayer).addTo(map)
+  syncVisibleLayer()
   renderMarkers()
 }
 
@@ -102,7 +119,10 @@ onMounted(async () => {
   emitBounds()
 })
 
-watch(() => props.places, renderMarkers, { deep: true })
+watch(() => props.places, () => {
+  syncVisibleLayer()
+  renderMarkers()
+}, { deep: true })
 watch(() => props.fitRequest, async () => {
   await nextTick()
   fitPlaces()
@@ -122,7 +142,7 @@ onBeforeUnmount(() => {
   <div class="map-frame" :style="mapStyle">
     <div ref="mapElement" class="leaflet-map" />
     <div v-if="loading" class="map-loading" role="status">지도 장소를 불러오는 중…</div>
-    <label class="cluster-toggle">
+    <label v-if="!courseMode" class="cluster-toggle">
       <span>Cluster</span>
       <input
         :checked="clusterEnabled"
