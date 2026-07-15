@@ -32,13 +32,16 @@ def register_exception_handlers(app: FastAPI) -> None:
             if first_error
             else "입력값이 올바르지 않습니다."
         )
-
-        code = (
-            "INVALID_POST_INPUT"
-            if request.url.path.startswith("/api/posts")
-            and request.method in {"POST", "PUT", "DELETE"}
-            else "INVALID_QUERY_PARAMETER"
-        )
+        if request.url.path.startswith("/api/chat") and request.method == "POST":
+            code = "INVALID_CHAT_INPUT"
+        elif request.url.path.startswith("/api/posts") and request.method in {
+            "POST",
+            "PUT",
+            "DELETE",
+        }:
+            code = "INVALID_POST_INPUT"
+        else:
+            code = "INVALID_QUERY_PARAMETER"
         return error_response(422, str(detail), code)
 
     @app.exception_handler(StarletteHTTPException)
