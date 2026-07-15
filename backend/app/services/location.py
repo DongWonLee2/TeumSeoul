@@ -1,4 +1,5 @@
 import json
+import math
 import re
 from collections.abc import Iterator
 from datetime import datetime
@@ -9,7 +10,17 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
+from app.core.constants import CONTENT_TYPES
+from app.core.exceptions import AppException, ResourceNotFoundError
 from app.models.location import Location
+from app.repositories.location import (
+    LocationQuery,
+    find_location_by_id,
+    find_locations,
+    find_nearby_candidates,
+)
+from app.schemas.common import PaginationMeta
+from app.schemas.location import LocationDetail, LocationSummary, NearbyLocationSummary
 
 EXPECTED_CONTENT_TYPES = {
     12: ("관광지", 783),
@@ -26,6 +37,10 @@ SEOUL_LATITUDE_RANGE = (37.0, 38.0)
 DISTRICT_PATTERN = re.compile(r"서울(?:특별시|특별)?\s+([가-힣]+구)(?:\s|$)")
 DATETIME_FORMAT = "%Y%m%d%H%M%S"
 UPSERT_BATCH_SIZE = 500
+NEARBY_RADIUS_KM = 3.0
+NEARBY_RESULT_LIMIT = 5
+NEARBY_CANDIDATE_LIMIT = 200
+EARTH_RADIUS_KM = 6371.0088
 
 
 class LocationSeedError(RuntimeError):
@@ -201,3 +216,173 @@ def _parse_datetime(value: Any, field: str) -> datetime:
 def _batched(records: list[dict[str, Any]], size: int) -> Iterator[list[dict[str, Any]]]:
     for index in range(0, len(records), size):
         yield records[index : index + size]
+
+
+def get_locations(
+    db: Session,
+    query: LocationQuery,
+) -> tuple[list[LocationSummary], PaginationMeta]:
+    if query.content_type_id is not None and query.content_type_id not in CONTENT_TYPES:
+        raise AppException(
+            status_code=422,
+            detail="지원하지 않는 콘텐츠 유형입니다.",
+            code="INVALID_QUERY_PARAMETER",
+        )
+
+    normalized_query = LocationQuery(
+        q=_optional_text(query.q),
+        content_type_id=query.content_type_id,
+        district=_optional_text(query.district),
+        has_image=query.has_image,
+        modified_year=query.modified_year,
+        sort=query.sort,
+        page=query.page,
+        size=query.size,
+    )
+    locations, total_items = find_locations(db, normalized_query)
+    total_pages = math.ceil(total_items / query.size) if total_items else 0
+    return (
+        [_to_location_summary(location) for location in locations],
+        PaginationMeta(
+            page=query.page,
+            size=query.size,
+            total_items=total_items,
+            total_pages=total_pages,
+        ),
+    )
+
+
+def get_location_detail(db: Session, location_id: int) -> LocationDetail:
+    location = find_location_by_id(db, location_id)
+    if location is None:
+        raise ResourceNotFoundError(
+            detail="장소를 찾을 수 없습니다.",
+            code="LOCATION_NOT_FOUND",
+        )
+
+    summary = _to_location_summary(location)
+    detail_warnings = [
+        *summary.warnings,
+        "운영시간은 제공 데이터에 없어 방문 전 확인이 필요합니다.",
+    ]
+    return LocationDetail(
+        **summary.model_dump(exclude={"warnings"}),
+        thumbnail_url=location.thumbnail_url,
+        telephone=location.telephone,
+        copyright_code=location.copyright_code,
+        class_codes=_class_codes(location),
+        warnings=detail_warnings,
+        related_post_count=0,
+        related_posts=[],
+        nearby_locations=_get_nearby_locations(db, location),
+    )
+
+
+def _to_location_summary(location: Location) -> LocationSummary:
+    return LocationSummary(
+        id=location.id,
+        source_content_id=location.source_content_id,
+        content_type_id=location.content_type_id,
+        content_type=CONTENT_TYPES[location.content_type_id]["name"],
+        title=location.title,
+        address=location.address,
+        district=location.district,
+        latitude=location.latitude,
+        longitude=location.longitude,
+        image_url=location.image_url,
+        source_modified_at=location.source_modified_at,
+        warnings=_location_warnings(location),
+    )
+
+
+def _location_warnings(location: Location) -> list[str]:
+    warnings: list[str] = []
+    if location.address is None:
+        warnings.append("주소 정보 없음")
+    if location.image_url is None:
+        warnings.append("대표 이미지 없음")
+    if location.latitude is None or location.longitude is None:
+        warnings.append("정확한 위치 정보 없음")
+    if location.content_type_id == 25:
+        warnings.append("대표 위치이며 전체 이동 경로가 아님")
+    elif location.content_type_id == 15:
+        warnings.append("행사 일정은 제공 데이터로 확인할 수 없음")
+    elif location.content_type_id == 32:
+        warnings.append("가격·객실·예약 가능 여부 미제공")
+    return warnings
+
+
+def _class_codes(location: Location) -> list[str]:
+    return [
+        code
+        for code in (
+            location.category_code_1,
+            location.category_code_2,
+            location.category_code_3,
+            location.classification_code_1,
+            location.classification_code_2,
+            location.classification_code_3,
+        )
+        if code
+    ]
+
+
+def _get_nearby_locations(db: Session, location: Location) -> list[NearbyLocationSummary]:
+    if location.latitude is None or location.longitude is None:
+        return []
+
+    latitude_delta = NEARBY_RADIUS_KM / 111.0
+    longitude_scale = max(math.cos(math.radians(location.latitude)), 0.01)
+    longitude_delta = NEARBY_RADIUS_KM / (111.0 * longitude_scale)
+    candidates = find_nearby_candidates(
+        db,
+        location_id=location.id,
+        latitude=location.latitude,
+        longitude=location.longitude,
+        latitude_delta=latitude_delta,
+        longitude_delta=longitude_delta,
+        candidate_limit=NEARBY_CANDIDATE_LIMIT,
+    )
+
+    results: list[tuple[Location, float]] = []
+    for candidate in candidates:
+        if candidate.latitude is None or candidate.longitude is None:
+            continue
+        distance = _haversine_distance_km(
+            location.latitude,
+            location.longitude,
+            candidate.latitude,
+            candidate.longitude,
+        )
+        if distance <= NEARBY_RADIUS_KM:
+            results.append((candidate, distance))
+
+    results.sort(key=lambda result: (result[1], result[0].id))
+    return [
+        NearbyLocationSummary(
+            id=candidate.id,
+            title=candidate.title,
+            content_type=CONTENT_TYPES[candidate.content_type_id]["name"],
+            distance_km=round(distance, 2),
+        )
+        for candidate, distance in results[:NEARBY_RESULT_LIMIT]
+    ]
+
+
+def _haversine_distance_km(
+    latitude_1: float,
+    longitude_1: float,
+    latitude_2: float,
+    longitude_2: float,
+) -> float:
+    latitude_delta = math.radians(latitude_2 - latitude_1)
+    longitude_delta = math.radians(longitude_2 - longitude_1)
+    latitude_1_radians = math.radians(latitude_1)
+    latitude_2_radians = math.radians(latitude_2)
+    haversine = (
+        math.sin(latitude_delta / 2) ** 2
+        + math.cos(latitude_1_radians)
+        * math.cos(latitude_2_radians)
+        * math.sin(longitude_delta / 2) ** 2
+    )
+    return 2 * EARTH_RADIUS_KM * math.asin(math.sqrt(haversine))
