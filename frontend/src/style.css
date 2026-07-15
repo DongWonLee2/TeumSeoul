@@ -182,6 +182,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid color-mix(in oklc
 .empty-related { padding: 20px; border-radius: 12px; background: var(--bg); color: var(--soft); font-size: 13px; text-align: center; }
 .related-section { margin-bottom: 20px; }
 .related-post-list { display: flex; flex-direction: column; gap: 8px; }
+.related-post-list.scrollable { max-height: 220px; padding-right: 5px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.related-post-error { margin: -4px 0 8px; color: oklch(45% .13 25); font-size: 11.5px; }
 .related-post-card { display: flex; width: 100%; align-items: center; gap: 12px; padding: 12px 14px; border: 0; border-radius: 12px; background: var(--bg); text-align: left; cursor: pointer; transition: box-shadow .18s, transform .18s; }
 .related-post-card:hover { box-shadow: 0 4px 14px rgb(0 0 0 / 7%); transform: translateY(-1px); }
 .related-post-main { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 7px; }
