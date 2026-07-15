@@ -1,4 +1,6 @@
 <script setup>
+import { onBeforeUnmount } from 'vue'
+
 defineProps({
   searchQuery: { type: String, required: true },
   categories: { type: Array, required: true },
@@ -7,18 +9,59 @@ defineProps({
   activeDistrict: { type: String, required: true },
 })
 
-defineEmits(['update:searchQuery', 'select-category', 'select-district', 'search'])
+const emit = defineEmits(['update:searchQuery', 'select-category', 'select-district', 'search'])
+
+const SEARCH_DEBOUNCE_MS = 400
+let searchTimer
+
+function clearSearchTimer() {
+  if (!searchTimer) return
+  clearTimeout(searchTimer)
+  searchTimer = undefined
+}
+
+function scheduleSearch() {
+  clearSearchTimer()
+  searchTimer = setTimeout(() => {
+    searchTimer = undefined
+    emit('search')
+  }, SEARCH_DEBOUNCE_MS)
+}
+
+function handleInput(event) {
+  emit('update:searchQuery', event.target.value)
+  scheduleSearch()
+}
+
+function selectCategory(category) {
+  clearSearchTimer()
+  emit('select-category', category)
+  emit('search')
+}
+
+function selectDistrict(district) {
+  clearSearchTimer()
+  emit('select-district', district)
+  emit('search')
+}
+
+function submitSearch() {
+  clearSearchTimer()
+  emit('search')
+}
+
+onBeforeUnmount(clearSearchTimer)
 </script>
 
 <template>
   <section class="filter-panel" aria-label="장소 검색 필터">
-    <form class="filter-search" role="search" @submit.prevent="$emit('search')">
+    <form class="filter-search" role="search" @submit.prevent="submitSearch">
       <input
         :value="searchQuery"
         type="search"
         placeholder="장소, 지역, 축제 이름으로 검색"
         aria-label="장소 검색"
-        @input="$emit('update:searchQuery', $event.target.value)"
+        @input="handleInput"
       />
       <button type="submit" class="search-submit">검색</button>
     </form>
@@ -28,7 +71,7 @@ defineEmits(['update:searchQuery', 'select-category', 'select-district', 'search
         type="button"
         class="filter-chip category-chip"
         :class="{ active: activeCategory === 'all' }"
-        @click="$emit('select-category', 'all')"
+        @click="selectCategory('all')"
       >
         전체
       </button>
@@ -38,7 +81,7 @@ defineEmits(['update:searchQuery', 'select-category', 'select-district', 'search
         type="button"
         class="filter-chip category-chip"
         :class="{ active: activeCategory === category.id }"
-        @click="$emit('select-category', category.id)"
+        @click="selectCategory(category.id)"
       >
         {{ category.name }}
       </button>
@@ -49,7 +92,7 @@ defineEmits(['update:searchQuery', 'select-category', 'select-district', 'search
         type="button"
         class="filter-chip district-chip"
         :class="{ active: activeDistrict === 'all' }"
-        @click="$emit('select-district', 'all')"
+        @click="selectDistrict('all')"
       >
         전체 자치구
       </button>
@@ -59,7 +102,7 @@ defineEmits(['update:searchQuery', 'select-category', 'select-district', 'search
         type="button"
         class="filter-chip district-chip"
         :class="{ active: activeDistrict === district }"
-        @click="$emit('select-district', district)"
+        @click="selectDistrict(district)"
       >
         {{ district }}
       </button>

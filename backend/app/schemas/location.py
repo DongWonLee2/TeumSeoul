@@ -46,7 +46,7 @@ class LocationDetail(LocationSummary):
     related_post_count: int = Field(default=0, ge=0, description="연결된 게시글 수")
     related_posts: list[RelatedPostSummary] = Field(
         default_factory=list,
-        description="최근 연결 게시글; 게시글 도메인 통합 전에는 빈 배열",
+        description="작성일시 내림차순 최근 연결 게시글 최대 5건",
     )
     nearby_locations: list[NearbyLocationSummary] = Field(
         default_factory=list,

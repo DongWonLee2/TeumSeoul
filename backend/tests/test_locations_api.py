@@ -134,11 +134,48 @@ def test_location_detail_contains_warnings_and_nearby_locations(client: TestClie
     assert data["nearby_locations"][0]["distance_km"] == pytest.approx(0.56, abs=0.01)
 
 
+def test_created_post_is_exposed_in_location_detail(client: TestClient) -> None:
+    created_posts: list[dict[str, object]] = []
+    for index in range(1, 7):
+        created = client.post(
+            "/api/posts",
+            json={
+                "location_id": 3,
+                "category": "방문 후기",
+                "status_tag": "여유" if index == 6 else None,
+                "title": f"강남 쇼핑센터 방문 후기 {index}",
+                "content": f"장소 상세 관련 게시글 연동 확인 {index}",
+                "password": "1234",
+                "visited_at": "2026-07-15",
+            },
+        )
+        assert created.status_code == 201
+        created_posts.append(created.json()["data"])
+
+    response = client.get("/api/locations/3")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["related_post_count"] == 6
+    assert [post["id"] for post in data["related_posts"]] == [
+        post["id"] for post in reversed(created_posts[1:])
+    ]
+    assert data["related_posts"][0] == {
+        "id": created_posts[5]["id"],
+        "title": "강남 쇼핑센터 방문 후기 6",
+        "category": "방문 후기",
+        "status_tag": "여유",
+        "created_at": created_posts[5]["created_at"],
+    }
+
+
 def test_location_detail_reports_missing_source_data(client: TestClient) -> None:
     response = client.get("/api/locations/4")
 
     assert response.status_code == 200
     data = response.json()["data"]
+    assert data["related_post_count"] == 0
+    assert data["related_posts"] == []
     assert data["nearby_locations"] == []
     assert data["warnings"] == [
         "주소 정보 없음",
