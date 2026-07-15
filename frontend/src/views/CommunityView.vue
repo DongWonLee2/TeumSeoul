@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import LeafletMap from '../components/LeafletMap.vue'
 import PostDetailView from './PostDetailView.vue'
 import { SEOUL_DISTRICTS, PLACES } from '../data/places.js'
+import { createPost, deletePost, getPostDetail, getPosts, updatePost } from '../api/posts.js'
 
 const WRITE_STATUS_TAGS = [
   { label: '혼잡', key: 'crowded' },
@@ -29,38 +30,14 @@ const communityDistricts = ref(
   [{ label: '전체', key: 'all' }, ...SEOUL_DISTRICTS.map((d) => ({ label: d, key: d }))],
 )
 
-const posts = ref([
-  {
-    id: 1,
-    category: '현장 제보',
-    title: '벚꽃 예쁜 카페 추천해주세요',
-    time: '2시간전',
-    views: 123,
-    placeName: '북촌카페',
-    statusTags: ['혼잡', '사진 추천'],
-    district: '종로구',
-  },
-  {
-    id: 2,
-    category: '방문 후기',
-    title: '주말에 하이킹 같이 가실 분?',
-    time: '1일전',
-    views: 45,
-    placeName: '북한산',
-    statusTags: [],
-    district: '강북구',
-  },
-  {
-    id: 3,
-    category: '현장 제보',
-    title: '서울시 무료 전시 정보 어디서 보나요?',
-    time: '3일전',
-    views: 78,
-    placeName: '시립미술관',
-    statusTags: ['이용 주의'],
-    district: '중구',
-  },
-])
+const posts = ref([])
+const isLoading = ref(false)
+const isSubmitting = ref(false)
+const loadError = ref('')
+const currentPage = ref(1)
+const totalPages = ref(1)
+const totalItems = ref(0)
+const pageSize = 20
 
 const isWrite = ref(false)
 const isEditing = ref(false)
@@ -69,8 +46,6 @@ const selectedPost = ref(null)
 const selectedCategory = ref('all')
 const selectedDistrict = ref('all')
 const communitySearchQuery = ref('')
-const pageSize = 20
-const currentPage = ref(1)
 const selectedWriteCategory = ref('report')
 const selectedStatusTags = ref([])
 const draftTitle = ref('')
@@ -80,22 +55,16 @@ const draftPlaceName = ref('')
 const selectedWritePlace = ref(null)
 const writePlaces = ref(PLACES.slice(0, 6))
 const writeSubmitLabel = ref('등록')
+const titleLength = computed(() => draftTitle.value.trim().length)
+const bodyLength = computed(() => draftBody.value.trim().length)
+const passwordLength = computed(() => draftPassword.value.trim().length)
+const titleCounter = computed(() => `${Math.min(titleLength.value, 100)}/100`)
+const bodyCounter = computed(() => `${Math.min(bodyLength.value, 5000)}/5000`)
+const passwordCounter = computed(() => `${Math.min(passwordLength.value, 30)}/30`)
 
-const filtered = computed(() => {
-  return posts.value.filter((p) => {
-    if (selectedCategory.value !== 'all' && p.category !== selectedCategory.value) return false
-    if (selectedDistrict.value !== 'all' && p.district !== selectedDistrict.value) return false
-    if (communitySearchQuery.value && !p.title.includes(communitySearchQuery.value)) return false
-    return true
-  })
-})
+const filtered = computed(() => posts.value)
 
-const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
-
-const communityPostsPage = computed(() => {
-  const start = (currentPage.value - 1) * pageSize
-  return filtered.value.slice(start, start + pageSize)
-})
+const communityPostsPage = computed(() => posts.value)
 
 const selectedWritePlaceName = computed(() => draftPlaceName.value || selectedWritePlace.value?.title || '')
 
@@ -137,35 +106,24 @@ function getStatusTagKeys(statusLabels = []) {
 function selectCategory(cat) {
   selectedCategory.value = cat.key
   currentPage.value = 1
+  loadPosts()
 }
 
 function selectDistrict(d) {
   selectedDistrict.value = d.key
   currentPage.value = 1
+  loadPosts()
 }
 
-function openPost(post) {
-  selectedPost.value = post
+async function openPost(post) {
+  try {
+    const detail = await getPostDetail(post.id)
+    selectedPost.value = mapPostFromApi({ ...detail, content: detail.content || '' })
+  } catch (error) {
+    selectedPost.value = mapPostFromApi({ ...post, content: post.body || post.content_preview || '' })
+  }
 }
 
-function handlePostEdit(post) {
-  isWrite.value = true
-  selectedPost.value = null
-  isEditing.value = true
-  editingPostId.value = post.id
-  writeSubmitLabel.value = '수정 완료'
-  selectedWriteCategory.value = getCategoryKey(post.category)
-  selectedStatusTags.value = getStatusTagKeys(post.statusTags || [])
-  draftTitle.value = post.title || ''
-  draftBody.value = post.body || ''
-  draftPassword.value = ''
-  draftPlaceName.value = post.placeName || ''
-  selectedWritePlace.value = PLACES.find((place) => place.title === post.placeName) || null
-}
-
-function handlePostDelete(post) {
-  console.log('delete', post)
-}
 
 function toggleStatusTag(tagKey) {
   if (selectedStatusTags.value.includes(tagKey)) {
@@ -184,61 +142,160 @@ function handleWritePlaceSelect(place) {
   draftPlaceName.value = place.title
 }
 
-function setCommunitySearchQuery(e) {
-  communitySearchQuery.value = e.target.value
-  currentPage.value = 1
+function formatPostTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function mapPostFromApi(item) {
+  return {
+    id: item.id,
+    category: item.category,
+    title: item.title,
+    time: formatPostTime(item.created_at),
+    views: item.view_count ?? 0,
+    placeName: item.location?.title || '장소 미정',
+    statusTags: item.status_tag ? [item.status_tag] : [],
+    district: item.location?.district || '미지정',
+    body: item.content,
+    author: '익명',
+    raw: item,
+  }
+}
+
+async function loadPosts() {
+  isLoading.value = true
+  loadError.value = ''
+  try {
+    const response = await getPosts({
+      q: communitySearchQuery.value || undefined,
+      category: selectedCategory.value !== 'all' ? communityCats.value.find((cat) => cat.key === selectedCategory.value)?.label : undefined,
+      district: selectedDistrict.value !== 'all' ? selectedDistrict.value : undefined,
+      page: currentPage.value,
+      size: pageSize,
+      sort: 'recent',
+    })
+    posts.value = (response.data || []).map(mapPostFromApi)
+    totalPages.value = response.meta?.total_pages || 1
+    totalItems.value = response.meta?.total_items || 0
+  } catch (error) {
+    loadError.value = error?.message || '게시글을 불러오지 못했습니다.'
+    posts.value = []
+  } finally {
+    isLoading.value = false
+  }
 }
 
 function goPage(n) {
   currentPage.value = n
+  loadPosts()
 }
 
-function submitPost() {
+function setCommunitySearchQuery(e) {
+  communitySearchQuery.value = e.target.value
+  currentPage.value = 1
+  loadPosts()
+}
+
+function validateDraft() {
   const title = draftTitle.value.trim()
   const body = draftBody.value.trim()
   const password = draftPassword.value.trim()
 
-  if (!title || !draftPlaceName.value || !body || !password) {
-    alert('제목, 장소, 내용, 비밀번호를 모두 입력해주세요.')
+  if (!title || !body || !selectedWriteCategory.value || !password) {
+    return '제목, 내용, 카테고리, 비밀번호를 모두 입력해주세요.'
+  }
+
+  if (title.length < 2 || title.length > 100) {
+    return '제목은 2~100자 사이로 입력해주세요.'
+  }
+
+  if (body.length < 2 || body.length > 5000) {
+    return '내용은 2~5000자 사이로 입력해주세요.'
+  }
+
+  if (password.length < 4 || password.length > 30) {
+    return '비밀번호는 4~30자 사이로 입력해주세요.'
+  }
+
+  return ''
+}
+
+async function submitPost() {
+  const title = draftTitle.value.trim()
+  const body = draftBody.value.trim()
+  const password = draftPassword.value.trim()
+  const categoryKey = selectedWriteCategory.value
+
+  const validationMessage = validateDraft()
+  if (validationMessage) {
+    alert(validationMessage)
     return
   }
 
-  const categoryLabel = WRITE_CATEGORIES.find((cat) => cat.key === selectedWriteCategory.value)?.label || '현장 제보'
-  const statusLabels = selectedStatusTags.value.map((tagKey) => {
-    return WRITE_STATUS_TAGS.find((tag) => tag.key === tagKey)?.label || tagKey
-  })
-
-  if (isEditing.value && editingPostId.value) {
-    const targetIndex = posts.value.findIndex((post) => post.id === editingPostId.value)
-    if (targetIndex !== -1) {
-      posts.value[targetIndex] = {
-        ...posts.value[targetIndex],
-        category: categoryLabel,
-        title,
-        placeName: draftPlaceName.value,
-        statusTags: statusLabels,
-        district: selectedWritePlace.value?.district || '미지정',
-        body,
-      }
-    }
-  } else {
-    posts.value.unshift({
-      id: Date.now(),
-      category: categoryLabel,
-      title,
-      time: '방금 전',
-      views: 0,
-      placeName: draftPlaceName.value,
-      statusTags: statusLabels,
-      district: selectedWritePlace.value?.district || '미지정',
-      body,
-      author: '익명',
-    })
+  const categoryLabel = WRITE_CATEGORIES.find((cat) => cat.key === categoryKey)?.label || '현장 제보'
+  const statusLabel = selectedStatusTags.value[0] ? WRITE_STATUS_TAGS.find((tag) => tag.key === selectedStatusTags.value[0])?.label : null
+  const payload = {
+    location_id: selectedWritePlace.value?.id || null,
+    category: categoryLabel,
+    status_tag: statusLabel,
+    title,
+    content: body,
+    visited_at: null,
+    password,
   }
 
-  backToCommunity()
-  currentPage.value = 1
+  isSubmitting.value = true
+  try {
+    if (isEditing.value && editingPostId.value) {
+      await updatePost(editingPostId.value, payload)
+    } else {
+      await createPost(payload)
+    }
+    await loadPosts()
+    backToCommunity()
+    currentPage.value = 1
+  } catch (error) {
+    alert(error?.message || '게시글을 저장하지 못했습니다.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
+
+async function handlePostEdit(post) {
+  isWrite.value = true
+  selectedPost.value = null
+  isEditing.value = true
+  editingPostId.value = post.id
+  writeSubmitLabel.value = '수정 완료'
+  const detail = await getPostDetail(post.id)
+  selectedWriteCategory.value = getCategoryKey(detail.category)
+  selectedStatusTags.value = detail.status_tag ? [WRITE_STATUS_TAGS.find((tag) => tag.label === detail.status_tag)?.key].filter(Boolean) : []
+  draftTitle.value = detail.title || ''
+  draftBody.value = detail.content || ''
+  draftPassword.value = ''
+  draftPlaceName.value = detail.location?.title || ''
+  selectedWritePlace.value = detail.location ? PLACES.find((place) => place.id === detail.location.id) || null : null
+}
+
+async function handlePostDelete(payload) {
+  const post = payload?.post || payload
+  const password = payload?.password || ''
+  if (!password) return
+  try {
+    await deletePost(post.id, password)
+    await loadPosts()
+    backToCommunity()
+  } catch (error) {
+    alert(error?.message || '비밀번호가 올리지 않아 삭제할 수 없습니다.')
+  }
+}
+
+onMounted(() => {
+  loadPosts()
+})
 </script>
 
 <template>
@@ -256,12 +313,16 @@ function submitPost() {
             </div>
           </div>
 
-          <input
-            v-model="draftTitle"
-            type="text"
-            class="community-write-input"
-            placeholder="제목을 입력하세요"
-          />
+          <div class="community-write-field">
+            <input
+              v-model="draftTitle"
+              type="text"
+              class="community-write-input"
+              placeholder="제목을 입력하세요"
+              maxlength="100"
+            />
+            <div class="community-write-counter">{{ titleCounter }}</div>
+          </div>
 
           <input
             :value="selectedWritePlaceName"
@@ -287,11 +348,15 @@ function submitPost() {
             </div>
           </div>
 
-          <textarea
-            v-model="draftBody"
-            class="community-write-textarea"
-            placeholder="내용을 입력하세요"
-          />
+          <div class="community-write-field">
+            <textarea
+              v-model="draftBody"
+              class="community-write-textarea"
+              placeholder="내용을 입력하세요"
+              maxlength="5000"
+            />
+            <div class="community-write-counter">{{ bodyCounter }}</div>
+          </div>
 
           <div class="chip-row write-chip-row">
             <button
@@ -306,14 +371,17 @@ function submitPost() {
             </button>
           </div>
 
-          <input
-            v-model="draftPassword"
-            type="password"
-            class="community-write-input"
-            placeholder="비밀번호 (글 수정·삭제 시 필요)"
-          />
-
-          <button class="community-submit-btn" type="button" @click="submitPost">{{ writeSubmitLabel }}</button>
+          <div class="community-write-field">
+            <input
+              v-model="draftPassword"
+              type="password"
+              class="community-write-input"
+              placeholder="비밀번호 (글 수정·삭제 시 필요)"
+              maxlength="30"
+            />
+            <div class="community-write-counter">{{ passwordCounter }}</div>
+          </div>
+          <button class="community-submit-btn" type="button" @click="submitPost" :disabled="isSubmitting">{{ isSubmitting ? '처리 중...' : writeSubmitLabel }}</button>
         </div>
       </div>
     </template>
@@ -352,7 +420,9 @@ function submitPost() {
         </div>
       </div>
 
-      <div class="posts-container">
+      <div v-if="isLoading" class="empty-results">게시글을 불러오는 중입니다…</div>
+      <div v-else-if="loadError" class="empty-results">{{ loadError }}</div>
+      <div v-else class="posts-container">
         <div v-for="post in communityPostsPage" :key="post.id" class="post-item">
           <div class="post-content" @click="openPost(post)">
             <div class="post-header">
@@ -367,7 +437,7 @@ function submitPost() {
           </div>
         </div>
 
-        <div v-if="!filtered.length" class="empty-results">검색 결과가 없어요</div>
+        <div v-if="!communityPostsPage.length" class="empty-results">검색 결과가 없어요</div>
       </div>
 
       <div class="pagination">
