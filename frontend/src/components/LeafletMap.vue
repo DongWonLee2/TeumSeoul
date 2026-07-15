@@ -8,6 +8,7 @@ const props = defineProps({
   places: { type: Array, required: true },
   categories: { type: Array, required: true },
   height: { type: String, default: '520px' },
+  loading: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['open-place', 'bounds-change'])
@@ -34,7 +35,9 @@ function renderMarkers() {
   markerLayer.clearLayers()
   clusterLayer.clearLayers()
 
-  props.places.forEach((place) => {
+  props.places
+    .filter((place) => Number.isFinite(place.latitude) && Number.isFinite(place.longitude))
+    .forEach((place) => {
     const marker = L.marker([place.latitude, place.longitude], { icon: markerIcon(place) })
       .bindTooltip(place.title, { direction: 'top', offset: [0, -24] })
       .on('click', () => emit('open-place', place))
@@ -77,6 +80,7 @@ onMounted(async () => {
   }).addTo(map)
   renderMarkers()
   map.on('moveend', emitBounds)
+  emitBounds()
 })
 
 watch(() => props.places, renderMarkers, { deep: true })
@@ -90,6 +94,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="map-frame" :style="mapStyle">
     <div ref="mapElement" class="leaflet-map" />
+    <div v-if="loading" class="map-loading" role="status">지도 장소를 불러오는 중…</div>
     <label class="cluster-toggle">
       <span>Cluster</span>
       <input

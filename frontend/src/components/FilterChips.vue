@@ -3,7 +3,7 @@ defineProps({
   searchQuery: { type: String, required: true },
   categories: { type: Array, required: true },
   districts: { type: Array, required: true },
-  activeCategory: { type: String, required: true },
+  activeCategory: { type: [String, Number], required: true },
   activeDistrict: { type: String, required: true },
 })
 

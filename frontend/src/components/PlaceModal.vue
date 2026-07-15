@@ -141,6 +141,12 @@ onBeforeUnmount(() => {
         <span>🔄 갱신일 {{ place.source_modified_at?.slice(0, 10) }}</span>
       </div>
       <div class="data-source">📊 데이터 근거 · {{ meta.source }}</div>
+      <div v-if="place.warnings?.length" class="place-warnings">
+        <strong>방문 전 확인해 주세요</strong>
+        <ul>
+          <li v-for="warning in place.warnings" :key="warning">{{ warning }}</li>
+        </ul>
+      </div>
       <h2>관련 게시글 ({{ place.related_post_count ?? 0 }})</h2>
       <div class="empty-related">
         {{ place.related_post_count ? '관련 게시글은 API 연결 후 표시됩니다.' : '아직 등록된 게시글이 없어요.' }}

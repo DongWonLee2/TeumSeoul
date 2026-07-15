@@ -72,7 +72,7 @@ onMounted(async () => {
   const [healthResult, metaResult] = await Promise.allSettled([getHealth(), getMeta()])
 
   if (healthResult.status === 'fulfilled') health.value = healthResult.value
-  else systemError.value = '백엔드 서버에 연결할 수 없어 샘플 데이터를 표시합니다.'
+  else systemError.value = '백엔드 서버에 연결할 수 없어 일부 기능이 제한됩니다.'
 
   if (metaResult.status === 'fulfilled') {
     categories.value = metaResult.value.content_types || CATEGORIES
