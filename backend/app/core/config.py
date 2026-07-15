@@ -53,6 +53,23 @@ class Settings(BaseSettings):
             "OPENAI_MAX_CANDIDATES", "TEUMSEOUL_OPENAI_MAX_CANDIDATES"
         ),
     )
+    recommendation_timeout_seconds: float = Field(
+        default=30,
+        gt=0,
+        validation_alias=AliasChoices(
+            "RECOMMENDATION_TIMEOUT_SECONDS",
+            "TEUMSEOUL_RECOMMENDATION_TIMEOUT_SECONDS",
+        ),
+    )
+    recommendation_candidate_limit: int = Field(
+        default=18,
+        ge=9,
+        le=30,
+        validation_alias=AliasChoices(
+            "RECOMMENDATION_CANDIDATE_LIMIT",
+            "TEUMSEOUL_RECOMMENDATION_CANDIDATE_LIMIT",
+        ),
+    )
     log_level: str = Field(
         default="INFO",
         validation_alias=AliasChoices("LOG_LEVEL", "TEUMSEOUL_LOG_LEVEL"),

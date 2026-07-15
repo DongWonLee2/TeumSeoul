@@ -49,7 +49,8 @@ function cancelPasswordPrompt() {
 }
 
 function confirmPasswordPrompt() {
-  if (!passwordInput.value.trim()) {
+  const password = passwordInput.value.trim()
+  if (!password) {
     hasPasswordError.value = true
     passwordError.value = '비밀번호를 입력해주세요.'
     return
@@ -58,8 +59,7 @@ function confirmPasswordPrompt() {
   hasPasswordError.value = false
   passwordPromptOpen.value = false
   passwordInput.value = ''
-  emit('delete', props.post)
-  window.alert('삭제 요청은 추후 백엔드 연동 시 처리됩니다.')
+  emit('delete', { post: props.post, password })
 }
 </script>
 

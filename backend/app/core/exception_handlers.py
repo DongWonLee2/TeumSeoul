@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core.config import settings
 from app.core.exceptions import AppException
 from app.schemas.common import ErrorResponse
 
@@ -32,7 +33,9 @@ def register_exception_handlers(app: FastAPI) -> None:
             if first_error
             else "입력값이 올바르지 않습니다."
         )
-        if request.url.path.startswith("/api/chat") and request.method == "POST":
+        if request.url.path.startswith(f"{settings.api_prefix}/recommend/"):
+            code = "INVALID_RECOMMENDATION_CONDITION"
+        elif request.url.path.startswith("/api/chat") and request.method == "POST":
             code = "INVALID_CHAT_INPUT"
         elif request.url.path.startswith("/api/posts") and request.method in {
             "POST",

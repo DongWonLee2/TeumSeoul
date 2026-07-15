@@ -41,6 +41,34 @@ def find_location_by_id(db: Session, location_id: int) -> Location | None:
     return db.get(Location, location_id)
 
 
+def find_recommendation_candidates(
+    db: Session,
+    *,
+    content_type_ids: set[int],
+    district: str | None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    limit: int,
+) -> list[Location]:
+    statement = select(Location).where(
+        Location.content_type_id.in_(content_type_ids),
+        Location.latitude.is_not(None),
+        Location.longitude.is_not(None),
+    )
+    if district:
+        statement = statement.where(Location.district == district)
+    if latitude is not None and longitude is not None:
+        approximate_distance = (
+            (Location.latitude - latitude) * (Location.latitude - latitude)
+            + (Location.longitude - longitude) * (Location.longitude - longitude)
+        )
+        statement = statement.order_by(approximate_distance.asc(), Location.id.asc())
+    else:
+        statement = statement.order_by(Location.source_modified_at.desc(), Location.id.asc())
+    statement = statement.limit(limit)
+    return list(db.scalars(statement).all())
+
+
 def find_nearby_candidates(
     db: Session,
     *,
