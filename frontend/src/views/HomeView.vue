@@ -1,9 +1,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import FilterChips from '../components/FilterChips.vue'
 import LeafletMap from '../components/LeafletMap.vue'
 import PlaceCard from '../components/PlaceCard.vue'
 import { getLocations, getMapLocations } from '../api/locations.js'
+import { getPosts } from '../api/posts.js'
 
 defineProps({
   categories: { type: Array, required: true },
@@ -11,6 +13,7 @@ defineProps({
 })
 
 const emit = defineEmits(['open-place', 'show-map'])
+const router = useRouter()
 const searchQuery = ref('')
 const activeCategory = ref('all')
 const activeDistrict = ref('all')
@@ -26,6 +29,13 @@ const mapMeta = ref({ count: 0, limit: 300, truncated: false })
 const mapBounds = ref(null)
 const mapLoading = ref(false)
 const mapError = ref('')
+const communityPostsPreview = ref([])
+const communityCats = ref([
+  { label: '전체', key: 'all' },
+  { label: '현장 제보', key: 'report' },
+  { label: '방문 후기', key: 'review' },
+])
+const communityCategory = ref('all')
 let listController
 let mapController
 
@@ -100,6 +110,34 @@ function onBoundsChange(bounds) {
   loadMapPlaces()
 }
 
+function selectCommunityCategory(cat) {
+  communityCategory.value = cat.key
+  loadCommunityPreview()
+}
+
+async function loadCommunityPreview() {
+  try {
+    const response = await getPosts({
+      page: 1,
+      size: 5,
+      sort: 'recent',
+      category: communityCategory.value !== 'all'
+        ? communityCats.value.find((cat) => cat.key === communityCategory.value)?.label
+        : undefined,
+    })
+    communityPostsPreview.value = (response.data || []).slice(0, 5).map((post) => ({
+      id: post.id,
+      category: post.category,
+      title: post.title,
+      author: '익명',
+      time: post.created_at ? new Date(post.created_at).toLocaleDateString('ko-KR') : '',
+      onClick: () => router.push({ name: 'community', query: { post: post.id } }),
+    }))
+  } catch (error) {
+    communityPostsPreview.value = []
+  }
+}
+
 function applyFilters() {
   appliedSearchQuery.value = searchQuery.value
   appliedCategory.value = activeCategory.value
@@ -108,7 +146,14 @@ function applyFilters() {
   loadMapPlaces()
 }
 
-onMounted(loadLocations)
+function goCommunity() {
+  router.push({ name: 'community' })
+}
+
+onMounted(() => {
+  loadLocations()
+  loadCommunityPreview()
+})
 
 onBeforeUnmount(() => {
   listController?.abort()
@@ -167,5 +212,36 @@ onBeforeUnmount(() => {
         @open-place="emit('open-place', $event)"
       />
     </section>
+
+    <div class="community-preview-card">
+      <div class="community-preview-head">
+        <span>커뮤니티 게시판</span>
+        <button type="button" @click="goCommunity">전체보기 ›</button>
+      </div>
+      <div class="chip-row">
+        <button
+          v-for="pc in communityCats"
+          :key="pc.key"
+          type="button"
+          :class="['filter-chip', 'category-chip', { active: communityCategory === pc.key }]"
+          @click="selectCommunityCategory(pc)"
+        >
+          {{ pc.label }}
+        </button>
+      </div>
+      <div class="community-preview-list">
+        <button
+          v-for="post in communityPostsPreview"
+          :key="post.id"
+          type="button"
+          class="community-preview-item"
+          @click="post.onClick"
+        >
+          <span class="community-preview-category">{{ post.category }}</span>
+          <span class="community-preview-title">{{ post.title }}</span>
+          <span class="community-preview-meta">{{ post.author }} · {{ post.time }}</span>
+        </button>
+      </div>
+    </div>
   </main>
 </template>

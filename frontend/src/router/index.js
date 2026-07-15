@@ -26,9 +26,25 @@ const router = createRouter({
       component: CommunityView,
       meta: { section: 'community' },
     },
+    {
+      path: '/community/places/:id',
+      name: 'community-place-detail',
+      component: CommunityView,
+      meta: { section: 'community', placeModal: true },
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
   scrollBehavior: () => ({ top: 0 }),
 })
+
+const PLACE_DETAIL_ROUTE_NAMES = {
+  map: 'map-place-detail',
+  community: 'community-place-detail',
+  home: 'place-detail',
+}
+
+export function placeDetailRouteName(section) {
+  return PLACE_DETAIL_ROUTE_NAMES[section] || 'place-detail'
+}
 
 export default router
