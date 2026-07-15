@@ -4,6 +4,7 @@ import AppHeader from './components/AppHeader.vue'
 import PlaceModal from './components/PlaceModal.vue'
 import HomeView from './views/HomeView.vue'
 import MapView from './views/MapView.vue'
+import CommunityView from './views/CommunityView.vue'
 import { PLACES } from './data/places.js'
 
 const currentView = ref('home')
@@ -28,11 +29,7 @@ function openPlace(place) {
       @show-map="currentView = 'map'"
     />
     <MapView v-else-if="currentView === 'map'" @open-place="openPlace" />
-
-    <section v-else class="coming-soon">
-      <h1>커뮤니티</h1>
-      <p>커뮤니티 화면은 팀원이 작업 중입니다.</p>
-    </section>
+    <CommunityView v-else-if="currentView === 'community'" />
 
     <PlaceModal
       v-if="selectedPlace"

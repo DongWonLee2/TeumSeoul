@@ -109,3 +109,25 @@ button:focus-visible, input:focus-visible { outline: 3px solid color-mix(in oklc
   .place-photo { width: 74px; height: 74px; }
   .place-stats { align-items: flex-start; flex-direction: column; gap: 4px; }
 }
+
+/* Community View Styles */
+.community-container { max-width: 760px; margin: 0 auto; padding: 24px 24px 60px; }
+.community-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.community-header h1 { font-size: 22px; font-weight: 800; margin: 0; }
+.write-btn { font-size: 13px; font-weight: 700; color: white; background: var(--accent); padding: 9px 16px; border-radius: 999px; border: 0; cursor: pointer; white-space: nowrap; }
+.community-filter-row { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.posts-container { display: flex; flex-direction: column; }
+.post-item { display: flex; align-items: center; gap: 10px; padding: 14px 2px; border-top: 1px solid var(--line); }
+.post-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; cursor: pointer; }
+.post-header { display: flex; align-items: center; gap: 8px; }
+.post-category { flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: oklch(95% 0.02 190); color: var(--accent-2); }
+.post-title { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.post-meta { font-size: 12.5px; color: var(--soft); }
+.status-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.status-tag { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--bg); color: var(--soft); border: 1px solid var(--line); }
+.empty-results { padding: 40px 20px; text-align: center; color: var(--soft); border: 1px dashed var(--line); border-radius: 16px; margin-top: 8px; }
+.pagination { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 20px; }
+.page-btn { padding: 6px 10px; cursor: pointer; border-radius: 8px; background: transparent; border: 0; color: var(--text); font-size: 14px; font-weight: 600; transition: background-color .2s, color .2s; }
+.page-btn.active { background: var(--accent); color: white; }
+.search-container { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 0 6px 0 16px; margin-top: 24px; }
+.search-input { flex: 1; padding: 11px 0; border: none; background: transparent; font-size: 14px; font-family: inherit; color: var(--text); outline: none; }
