@@ -22,6 +22,15 @@ DISTRICTS = ("종로구", "강남구", "마포구", "송파구")
 CONTENT_TYPE_IDS = (12, 14, 15, 25, 28, 38)
 
 
+@pytest.fixture(autouse=True)
+def disable_external_openai(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        recommendation_service,
+        "_request_openai_recommendations",
+        lambda course_options, request: None,
+    )
+
+
 @pytest.fixture(scope="module")
 def client() -> Iterator[TestClient]:
     engine = create_engine(
@@ -62,81 +71,56 @@ def client() -> Iterator[TestClient]:
 
 
 @pytest.mark.parametrize(
-    ("payload", "expected_place_count"),
+    "payload",
     [
-        (
-            {
-                "available_minutes": 120,
-                "companion": "friends",
-                "mood": "culture",
-                "district": "종로구",
-            },
-            3,
-        ),
-        (
-            {
-                "available_minutes": 60,
-                "companion": "solo",
-                "mood": "shopping",
-                "district": "강남구",
-            },
-            2,
-        ),
-        (
-            {
-                "available_minutes": 240,
-                "companion": "couple",
-                "mood": "healing",
-                "district": "마포구",
-            },
-            4,
-        ),
-        (
-            {
-                "available_minutes": 120,
-                "companion": "family",
-                "mood": "activity",
-                "district": "송파구",
-            },
-            3,
-        ),
-        (
-            {"available_minutes": 30, "companion": "solo", "mood": "culture"},
-            1,
-        ),
-        (
-            {
-                "available_minutes": 60,
-                "companion": "couple",
-                "mood": "night_view",
-                "district": "종로구",
-            },
-            2,
-        ),
-        (
-            {
-                "available_minutes": 120,
-                "companion": "family",
-                "mood": "healing",
-                "district": "강남구",
-            },
-            3,
-        ),
-        (
-            {
-                "available_minutes": 240,
-                "companion": "friends",
-                "mood": "shopping",
-                "district": "마포구",
-            },
-            4,
-        ),
+        {
+            "available_minutes": 120,
+            "companion": "friends",
+            "mood": "culture",
+            "district": "종로구",
+        },
+        {
+            "available_minutes": 60,
+            "companion": "solo",
+            "mood": "shopping",
+            "district": "강남구",
+        },
+        {
+            "available_minutes": 240,
+            "companion": "couple",
+            "mood": "healing",
+            "district": "마포구",
+        },
+        {
+            "available_minutes": 120,
+            "companion": "family",
+            "mood": "activity",
+            "district": "송파구",
+        },
+        {"available_minutes": 30, "companion": "solo", "mood": "culture"},
+        {
+            "available_minutes": 60,
+            "companion": "couple",
+            "mood": "night_view",
+            "district": "종로구",
+        },
+        {
+            "available_minutes": 120,
+            "companion": "family",
+            "mood": "healing",
+            "district": "강남구",
+        },
+        {
+            "available_minutes": 240,
+            "companion": "friends",
+            "mood": "shopping",
+            "district": "마포구",
+        },
     ],
 )
 def test_recommendation_rule_fallback_supports_representative_conditions(
     client: TestClient,
     payload: dict[str, object],
-    expected_place_count: int,
 ) -> None:
     response = client.post("/api/recommend/situational", json=payload)
 
@@ -145,11 +129,19 @@ def test_recommendation_rule_fallback_supports_representative_conditions(
     assert body["meta"]["count"] == 3
     assert body["meta"]["fallback"] is True
     assert len(body["data"]["recommendations"]) == 3
+    all_ids: list[int] = []
     for course in body["data"]["recommendations"]:
-        assert course["estimated_place_count"] == expected_place_count
+        assert course["estimated_duration_minutes"] <= payload["available_minutes"]
+        assert course["estimated_duration_minutes"] == (
+            sum(location["estimated_visit_minutes"] for location in course["locations"])
+            + course["estimated_travel_minutes"]
+        )
         ids = [location["id"] for location in course["locations"]]
-        assert len(ids) == len(set(ids)) == expected_place_count
-        assert course["warnings"][0] == "정확한 이동시간과 최적 경로는 제공하지 않습니다."
+        assert len(ids) == len(set(ids)) == course["estimated_place_count"]
+        assert all(location["experience_type"] for location in course["locations"])
+        assert course["warnings"][0].startswith("이동시간과 거리는 직선거리")
+        all_ids.extend(ids)
+    assert len(all_ids) == len(set(all_ids))
 
 
 def test_recommendation_uses_valid_openai_selection(
@@ -157,19 +149,19 @@ def test_recommendation_uses_valid_openai_selection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def fake_openai_selection(
-        candidates: list[Location],
+        course_options: list[recommendation_service.CourseOption],
         request: SituationalRecommendationRequest,
     ) -> AICourseSelection:
         del request
-        pairs = ((0, 1), (1, 2), (2, 3))
+        selected = recommendation_service._select_fallback_options(course_options)
         return AICourseSelection(
             recommendations=[
                 AICourse(
                     title=f"AI 추천 코스 {index + 1}",
-                    reason="후보 장소만 사용한 추천입니다.",
-                    location_ids=[candidates[first].id, candidates[second].id],
+                    reason="검증된 후보 코스만 사용한 추천입니다.",
+                    candidate_course_id=option.id,
                 )
-                for index, (first, second) in enumerate(pairs)
+                for index, option in enumerate(selected)
             ]
         )
 
@@ -197,16 +189,17 @@ def test_recommendation_rejects_hallucinated_openai_ids(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def fake_invalid_selection(
-        candidates: list[Location],
+        course_options: list[recommendation_service.CourseOption],
         request: SituationalRecommendationRequest,
     ) -> AICourseSelection:
+        del course_options
         del request
         return AICourseSelection(
             recommendations=[
                 AICourse(
                     title=f"잘못된 코스 {index}",
-                    reason="DB에 없는 ID를 포함합니다.",
-                    location_ids=[candidates[index].id, 999999],
+                    reason="서버가 제공하지 않은 코스 ID를 포함합니다.",
+                    candidate_course_id=f"candidate-{999997 + index}",
                 )
                 for index in range(3)
             ]
@@ -230,6 +223,73 @@ def test_recommendation_rejects_hallucinated_openai_ids(
         for location in course["locations"]
     }
     assert 999999 not in returned_ids
+
+
+def test_culture_courses_balance_museum_time_diversity_and_distance() -> None:
+    request = SituationalRecommendationRequest(
+        available_minutes=120,
+        companion="friends",
+        mood="culture",
+        district="종로구",
+        current_location={"latitude": 37.575, "longitude": 126.98},
+    )
+    definitions = [
+        ("신문박물관", 14),
+        ("역사박물관", 14),
+        ("현대미술관", 14),
+        ("미디어아카이브", 14),
+        ("한옥문화거리", 12),
+        ("전통문화유적", 12),
+        ("궁궐역사터", 12),
+        ("종묘문화재", 12),
+        ("도심산책길", 12),
+        ("문화광장", 12),
+        ("전망공원", 12),
+        ("숲둘레길", 12),
+    ]
+    candidates: list[recommendation_service.ScoredCandidate] = []
+    for index, (title, content_type_id) in enumerate(definitions, start=1):
+        location = _location(
+            id=index,
+            source_content_id=f"quality-{index}",
+            content_type_id=content_type_id,
+            title=title,
+            district="종로구",
+            latitude=37.575 + index * 0.0002,
+            longitude=126.98 + index * 0.0002,
+        )
+        experience_type = recommendation_service._classify_experience(location)
+        candidates.append(
+            recommendation_service.ScoredCandidate(
+                location=location,
+                score=100 - index,
+                experience_type=experience_type,
+                visit_minutes=recommendation_service.EXPERIENCE_VISIT_MINUTES[
+                    experience_type
+                ],
+            )
+        )
+
+    options = recommendation_service._build_course_options(
+        candidates,
+        request,
+        require_diversity=True,
+    )
+    selected = recommendation_service._select_fallback_options(options)
+
+    assert len(selected) == 3
+    all_ids: list[int] = []
+    for option in selected:
+        assert option.estimated_duration_minutes <= 120
+        assert option.experience_types.count("museum_art") <= 1
+        assert len(set(option.experience_types)) >= 2
+        all_ids.extend(option.location_ids)
+    assert len(all_ids) == len(set(all_ids))
+
+
+def test_shopping_and_activity_candidates_exclude_museum_experience() -> None:
+    assert "museum_art" not in recommendation_service.MOOD_EXPERIENCE_TYPES["shopping"]
+    assert "museum_art" not in recommendation_service.MOOD_EXPERIENCE_TYPES["activity"]
 
 
 @pytest.mark.parametrize(
@@ -287,7 +347,7 @@ def test_recommendation_openapi_has_korean_description(client: TestClient) -> No
     operation = response.json()["paths"]["/api/recommend/situational"]["post"]
     assert operation["tags"] == ["상황형 추천"]
     assert operation["summary"] == "상황형 서울 여행코스 추천"
-    assert "규칙 기반 코스로 자동 전환" in operation["description"]
+    assert "서버가 선택한 검증 코스로 자동 전환" in operation["description"]
 
 
 def _location(**overrides: object) -> Location:
