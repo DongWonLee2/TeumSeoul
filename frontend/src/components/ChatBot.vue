@@ -5,9 +5,28 @@ import { placeDetailRouteName } from '../router/index.js'
 import { sendChatMessage } from '../api/chat.js'
 import { getPostDetail } from '../api/posts.js'
 import { formatPostTime } from '../utils/datetime.js'
+import { SEOUL_DISTRICTS } from '../data/places.js'
 
 const route = useRoute()
 const router = useRouter()
+
+const COMPANION_OPTIONS = [
+  { value: 'solo', label: '혼자' },
+  { value: 'couple', label: '커플' },
+  { value: 'friends', label: '친구' },
+  { value: 'family', label: '가족' },
+]
+const MOOD_OPTIONS = [
+  { value: 'healing', label: '힐링' },
+  { value: 'culture', label: '문화' },
+  { value: 'activity', label: '액티비티' },
+  { value: 'night_view', label: '야경' },
+  { value: 'shopping', label: '쇼핑' },
+]
+const DISTRICT_OPTIONS = [
+  ...SEOUL_DISTRICTS.map((district) => ({ value: district, label: district })),
+  { value: '', label: '상관없음' },
+]
 
 const chatOpen = ref(false)
 const chatPanel = ref(null)
@@ -37,6 +56,7 @@ const messages = ref([
 const chatInput = ref('')
 const chatBusy = ref(false)
 const chatError = ref('')
+const pendingRecommendation = ref(null)
 
 function toggleChat() {
   chatOpen.value = !chatOpen.value
@@ -92,12 +112,70 @@ function getCurrentLocation() {
 
 async function sendChatInput() {
   const message = chatInput.value.trim()
-  if (!message || chatBusy.value) return
+  if (!message || chatBusy.value || pendingRecommendation.value) return
 
+  chatInput.value = ''
+  messages.value.push({ isUser: true, text: message })
+
+  if (message.includes('추천')) {
+    startRecommendationFlow(message)
+    return
+  }
+
+  await runChatQuery(message)
+}
+
+function startRecommendationFlow(message) {
+  pendingRecommendation.value = { message, companion: null, mood: null, district: null }
+  messages.value.push({
+    isAi: true,
+    text: '추천을 위해 몇 가지 여쭤볼게요. 누구와 함께 하시나요?',
+    quickReplies: COMPANION_OPTIONS,
+    onSelect: selectCompanion,
+  })
+}
+
+function selectCompanion(option, message) {
+  message.answered = true
+  pendingRecommendation.value.companion = option.value
+  messages.value.push({ isUser: true, text: option.label })
+  messages.value.push({
+    isAi: true,
+    text: '어떤 분위기를 원하세요?',
+    quickReplies: MOOD_OPTIONS,
+    onSelect: selectMood,
+  })
+}
+
+function selectMood(option, message) {
+  message.answered = true
+  pendingRecommendation.value.mood = option.value
+  messages.value.push({ isUser: true, text: option.label })
+  messages.value.push({
+    isAi: true,
+    text: '희망하는 지역이 있으신가요?',
+    quickReplies: DISTRICT_OPTIONS,
+    onSelect: selectDistrict,
+  })
+}
+
+async function selectDistrict(option, message) {
+  message.answered = true
+  pendingRecommendation.value.district = option.value || undefined
+  messages.value.push({ isUser: true, text: option.label })
+
+  const pending = pendingRecommendation.value
+  pendingRecommendation.value = null
+  await runChatQuery(pending.message, {
+    companion: pending.companion,
+    mood: pending.mood,
+    district: pending.district,
+  })
+}
+
+async function runChatQuery(message, context) {
   chatBusy.value = true
   chatError.value = ''
-  messages.value.push({ isUser: true, text: message })
-  chatInput.value = ''
 
   const history = messages.value
     .slice(-8)
@@ -106,9 +184,11 @@ async function sendChatInput() {
 
   try {
     const location = await getCurrentLocation()
+    const mergedContext = { ...context }
+    if (location) mergedContext.current_location = location
     const payload = {
       message,
-      context: location ? { current_location: location } : undefined,
+      context: Object.keys(mergedContext).length > 0 ? mergedContext : undefined,
       history,
     }
     const response = await sendChatMessage(payload)
@@ -172,6 +252,18 @@ async function sendChatInput() {
           <div v-if="message.isUser" class="chat-bubble chat-bubble-user">{{ message.text }}</div>
           <template v-else>
             <div class="chat-bubble chat-bubble-ai">{{ message.text }}</div>
+
+            <div v-if="message.quickReplies && !message.answered" class="chat-quick-replies">
+              <button
+                v-for="option in message.quickReplies"
+                :key="option.value"
+                type="button"
+                class="chat-quick-reply"
+                @click="message.onSelect(option, message)"
+              >
+                {{ option.label }}
+              </button>
+            </div>
 
             <div v-if="message.hasCards" class="chat-cards">
               <button
