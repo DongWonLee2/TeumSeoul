@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import LeafletMap from '../components/LeafletMap.vue'
+import PostDetailView from './PostDetailView.vue'
 import { SEOUL_DISTRICTS, PLACES } from '../data/places.js'
 
 const WRITE_STATUS_TAGS = [
@@ -62,6 +63,9 @@ const posts = ref([
 ])
 
 const isWrite = ref(false)
+const isEditing = ref(false)
+const editingPostId = ref(null)
+const selectedPost = ref(null)
 const selectedCategory = ref('all')
 const selectedDistrict = ref('all')
 const communitySearchQuery = ref('')
@@ -97,14 +101,19 @@ const selectedWritePlaceName = computed(() => draftPlaceName.value || selectedWr
 
 function goWrite() {
   isWrite.value = true
+  selectedPost.value = null
+  resetDraft()
 }
 
 function backToCommunity() {
   isWrite.value = false
+  selectedPost.value = null
   resetDraft()
 }
 
 function resetDraft() {
+  isEditing.value = false
+  editingPostId.value = null
   selectedWriteCategory.value = 'report'
   selectedStatusTags.value = []
   draftTitle.value = ''
@@ -112,6 +121,17 @@ function resetDraft() {
   draftPassword.value = ''
   draftPlaceName.value = ''
   selectedWritePlace.value = null
+  writeSubmitLabel.value = '등록'
+}
+
+function getCategoryKey(categoryLabel) {
+  return WRITE_CATEGORIES.find((cat) => cat.label === categoryLabel)?.key || 'report'
+}
+
+function getStatusTagKeys(statusLabels = []) {
+  return statusLabels
+    .map((label) => WRITE_STATUS_TAGS.find((tag) => tag.label === label)?.key)
+    .filter(Boolean)
 }
 
 function selectCategory(cat) {
@@ -125,7 +145,26 @@ function selectDistrict(d) {
 }
 
 function openPost(post) {
-  alert(`열기: ${post.title}`)
+  selectedPost.value = post
+}
+
+function handlePostEdit(post) {
+  isWrite.value = true
+  selectedPost.value = null
+  isEditing.value = true
+  editingPostId.value = post.id
+  writeSubmitLabel.value = '수정 완료'
+  selectedWriteCategory.value = getCategoryKey(post.category)
+  selectedStatusTags.value = getStatusTagKeys(post.statusTags || [])
+  draftTitle.value = post.title || ''
+  draftBody.value = post.body || ''
+  draftPassword.value = ''
+  draftPlaceName.value = post.placeName || ''
+  selectedWritePlace.value = PLACES.find((place) => place.title === post.placeName) || null
+}
+
+function handlePostDelete(post) {
+  console.log('delete', post)
 }
 
 function toggleStatusTag(tagKey) {
@@ -169,18 +208,34 @@ function submitPost() {
     return WRITE_STATUS_TAGS.find((tag) => tag.key === tagKey)?.label || tagKey
   })
 
-  posts.value.unshift({
-    id: Date.now(),
-    category: categoryLabel,
-    title,
-    time: '방금 전',
-    views: 0,
-    placeName: draftPlaceName.value,
-    statusTags: statusLabels,
-    district: selectedWritePlace.value?.district || '미지정',
-  })
+  if (isEditing.value && editingPostId.value) {
+    const targetIndex = posts.value.findIndex((post) => post.id === editingPostId.value)
+    if (targetIndex !== -1) {
+      posts.value[targetIndex] = {
+        ...posts.value[targetIndex],
+        category: categoryLabel,
+        title,
+        placeName: draftPlaceName.value,
+        statusTags: statusLabels,
+        district: selectedWritePlace.value?.district || '미지정',
+        body,
+      }
+    }
+  } else {
+    posts.value.unshift({
+      id: Date.now(),
+      category: categoryLabel,
+      title,
+      time: '방금 전',
+      views: 0,
+      placeName: draftPlaceName.value,
+      statusTags: statusLabels,
+      district: selectedWritePlace.value?.district || '미지정',
+      body,
+      author: '익명',
+    })
+  }
 
-  writeSubmitLabel.value = '등록 완료'
   backToCommunity()
   currentPage.value = 1
 }
@@ -263,6 +318,10 @@ function submitPost() {
       </div>
     </template>
 
+    <template v-else-if="selectedPost">
+      <PostDetailView :post="selectedPost" @back="backToCommunity" @edit="handlePostEdit" @delete="handlePostDelete" />
+    </template>
+
     <template v-else>
       <div class="community-header">
         <h1>커뮤니티</h1>
@@ -335,7 +394,3 @@ function submitPost() {
     </template>
   </div>
 </template>
-
-<style scoped>
-/* Styles are defined in the global style.css */
-</style>

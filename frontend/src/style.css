@@ -150,7 +150,32 @@ button:focus-visible, input:focus-visible { outline: 3px solid color-mix(in oklc
 .write-chip.active { border-color: transparent; background: var(--accent); color: white; }
 .community-submit-btn { align-self: flex-end; padding: 10px 22px; border: 0; border-radius: 999px; background: var(--accent); color: white; font-size: 14px; font-weight: 700; cursor: pointer; }
 
+.post-detail-screen { max-width: 680px; margin: 0 auto; padding: 24px 24px 60px; }
+.post-detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.post-detail-back { border: 0; background: transparent; color: var(--soft); font-size: 13.5px; font-weight: 700; cursor: pointer; padding: 0; }
+.post-detail-actions { display: flex; gap: 8px; }
+.post-detail-action { border: 1px solid var(--line); background: transparent; color: var(--soft); font-size: 12.5px; font-weight: 600; padding: 6px 13px; border-radius: 999px; cursor: pointer; }
+.post-detail-tags-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.post-detail-category, .post-detail-status-tag, .post-detail-place { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
+.post-detail-category { background: oklch(95% 0.02 190); color: var(--accent-2); }
+.post-detail-status-tag { background: var(--bg); color: var(--soft); border: 1px solid var(--line); }
+.post-detail-place { color: var(--soft); background: transparent; padding-left: 0; }
+.post-detail-title { font-size: 22px; font-weight: 800; margin: 0 0 8px; line-height: 1.4; }
+.post-detail-meta-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12.5px; color: var(--soft); margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.post-detail-meta { display: flex; gap: 12px; flex-wrap: wrap; }
+.post-detail-actions-inline { display: flex; }
+.post-detail-body { font-size: 15px; line-height: 1.75; margin: 0; white-space: pre-wrap; }
+.password-prompt-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 20px; }
+.password-prompt-card { background: var(--surface); border-radius: 18px; padding: 22px; width: min(320px, 100%); display: flex; flex-direction: column; gap: 12px; }
+.password-prompt-title { font-weight: 700; font-size: 15px; }
+.password-prompt-input { width: 100%; padding: 11px 14px; border-radius: 10px; border: 1px solid var(--line); font-size: 14px; font-family: inherit; outline: none; }
+.password-prompt-error { font-size: 12.5px; color: oklch(55% 0.18 25); }
+.password-prompt-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+.password-prompt-cancel { font-size: 13px; font-weight: 600; color: var(--soft); padding: 9px 16px; border-radius: 999px; cursor: pointer; border: 1px solid var(--line); background: transparent; }
+.password-prompt-confirm { font-size: 13px; font-weight: 700; color: white; background: var(--accent); padding: 9px 16px; border-radius: 999px; cursor: pointer; border: 0; }
+
 @media (max-width: 760px) {
   .community-container { padding: 18px 16px 60px; }
   .community-write-map-card { padding: 12px; }
+  .post-detail-screen { padding: 18px 16px 60px; }
 }
