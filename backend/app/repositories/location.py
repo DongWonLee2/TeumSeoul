@@ -46,6 +46,8 @@ def find_recommendation_candidates(
     *,
     content_type_ids: set[int],
     district: str | None,
+    latitude: float | None = None,
+    longitude: float | None = None,
     limit: int,
 ) -> list[Location]:
     statement = select(Location).where(
@@ -55,9 +57,15 @@ def find_recommendation_candidates(
     )
     if district:
         statement = statement.where(Location.district == district)
-    statement = statement.order_by(Location.source_modified_at.desc(), Location.id.asc()).limit(
-        limit
-    )
+    if latitude is not None and longitude is not None:
+        approximate_distance = (
+            (Location.latitude - latitude) * (Location.latitude - latitude)
+            + (Location.longitude - longitude) * (Location.longitude - longitude)
+        )
+        statement = statement.order_by(approximate_distance.asc(), Location.id.asc())
+    else:
+        statement = statement.order_by(Location.source_modified_at.desc(), Location.id.asc())
+    statement = statement.limit(limit)
     return list(db.scalars(statement).all())
 
 

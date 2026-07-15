@@ -1,10 +1,11 @@
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, model_validator
 
 from app.schemas.common import APIModel
 
 AvailableMinutes = Literal[30, 60, 120, 240]
+RecommendationMode = Literal["nearby", "district"]
 Companion = Literal["solo", "couple", "friends", "family"]
 Mood = Literal["healing", "culture", "activity", "night_view", "shopping"]
 SeoulDistrict = Literal[
@@ -42,6 +43,32 @@ class CurrentLocation(APIModel):
 
 
 class SituationalRecommendationRequest(APIModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "recommendation_mode": "nearby",
+                    "available_minutes": 120,
+                    "companion": "friends",
+                    "mood": "culture",
+                    "current_location": {"latitude": 37.575, "longitude": 126.98},
+                },
+                {
+                    "recommendation_mode": "district",
+                    "available_minutes": 240,
+                    "companion": "friends",
+                    "mood": "culture",
+                    "district": "강남구",
+                },
+            ]
+        },
+    )
+
+    recommendation_mode: RecommendationMode = Field(
+        description="추천 범위 선택: 현재 위치 주변 또는 지정 자치구",
+        examples=["nearby"],
+    )
     available_minutes: AvailableMinutes = Field(description="사용 가능한 시간(분)", examples=[120])
     companion: Companion = Field(description="동행 유형", examples=["friends"])
     mood: Mood = Field(description="원하는 분위기", examples=["culture"])
@@ -52,8 +79,21 @@ class SituationalRecommendationRequest(APIModel):
     )
     current_location: CurrentLocation | None = Field(
         default=None,
-        description="현재 위치; 생략하면 거리 점수를 적용하지 않음",
+        description="nearby 모드에서 필수인 현재 위치",
     )
+
+    @model_validator(mode="after")
+    def validate_recommendation_mode_fields(self) -> Self:
+        if self.recommendation_mode == "nearby":
+            if self.current_location is None:
+                raise ValueError("현재 위치 추천에는 current_location이 필요합니다.")
+            if self.district is not None:
+                raise ValueError("현재 위치 추천에는 district를 함께 입력할 수 없습니다.")
+        elif self.district is None:
+            raise ValueError("지역 지정 추천에는 district가 필요합니다.")
+        elif self.current_location is not None:
+            raise ValueError("지역 지정 추천에는 current_location을 함께 입력할 수 없습니다.")
+        return self
 
 
 class RepresentativeLocation(APIModel):
@@ -100,10 +140,12 @@ class SituationalCourse(APIModel):
 
 
 class AppliedConditions(APIModel):
+    recommendation_mode: RecommendationMode
     available_minutes: AvailableMinutes
     companion: Companion
     mood: Mood
     district: SeoulDistrict | None = None
+    current_location: CurrentLocation | None = None
 
 
 class SituationalRecommendationData(APIModel):
