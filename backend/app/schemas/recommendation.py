@@ -67,6 +67,12 @@ class RecommendedLocation(APIModel):
     content_type: str
     address: str | None
     image_url: str | None
+    experience_type: str = Field(description="박물관·미술관, 산책·야외 등 내부 경험 유형")
+    estimated_visit_minutes: int = Field(
+        ge=15,
+        le=120,
+        description="경험 유형을 바탕으로 계산한 예상 체류시간(분)",
+    )
     match_reasons: list[str]
 
 
@@ -76,6 +82,19 @@ class SituationalCourse(APIModel):
     reason: str
     representative_location: RepresentativeLocation
     estimated_place_count: int = Field(ge=1, le=4)
+    estimated_duration_minutes: int = Field(
+        ge=15,
+        le=240,
+        description="예상 체류시간과 이동시간을 합한 코스 총시간(분)",
+    )
+    estimated_travel_minutes: int = Field(
+        ge=0,
+        description="직선거리와 도보 속도로 계산한 예상 이동시간(분)",
+    )
+    estimated_distance_km: float = Field(
+        ge=0,
+        description="현재 위치와 장소 간 직선거리 합계(km)",
+    )
     locations: list[RecommendedLocation] = Field(min_length=1, max_length=4)
     warnings: list[str]
 
@@ -109,7 +128,7 @@ class AICourse(APIModel):
 
     title: str = Field(min_length=1, max_length=80)
     reason: str = Field(min_length=1, max_length=300)
-    location_ids: list[int] = Field(min_length=1, max_length=4)
+    candidate_course_id: str = Field(min_length=1, max_length=40)
 
 
 class AICourseSelection(APIModel):
