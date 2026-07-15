@@ -3,7 +3,12 @@ import { computed, ref } from 'vue'
 import FilterChips from '../components/FilterChips.vue'
 import LeafletMap from '../components/LeafletMap.vue'
 import PlaceCard from '../components/PlaceCard.vue'
-import { CATEGORIES, PLACES, SEOUL_DISTRICTS } from '../data/places.js'
+import { PLACES } from '../data/places.js'
+
+defineProps({
+  categories: { type: Array, required: true },
+  districts: { type: Array, required: true },
+})
 
 defineEmits(['open-place'])
 
@@ -18,8 +23,8 @@ const filteredPlaces = computed(() => {
     const districtMatches = activeDistrict.value === 'all' || place.district === activeDistrict.value
     const queryMatches = !query
       || place.title.toLowerCase().includes(query)
-      || place.district.toLowerCase().includes(query)
-      || place.address.toLowerCase().includes(query)
+      || (place.district || '').toLowerCase().includes(query)
+      || (place.address || '').toLowerCase().includes(query)
     return categoryMatches && districtMatches && queryMatches
   })
 })
@@ -28,8 +33,8 @@ const filteredPlaces = computed(() => {
 <template>
   <FilterChips
     v-model:search-query="searchQuery"
-    :categories="CATEGORIES"
-    :districts="SEOUL_DISTRICTS"
+    :categories="categories"
+    :districts="districts"
     :active-category="activeCategory"
     :active-district="activeDistrict"
     @select-category="activeCategory = $event"
@@ -44,6 +49,7 @@ const filteredPlaces = computed(() => {
 
     <LeafletMap
       :places="filteredPlaces"
+      :categories="categories"
       height="min(640px, 70vh)"
       @open-place="$emit('open-place', $event)"
     />
