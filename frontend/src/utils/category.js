@@ -1,7 +1,7 @@
 import { CATEGORIES } from '../data/places.js'
 
-export function getCategoryMeta(key) {
-  const category = CATEGORIES.find((item) => item.key === key) ?? CATEGORIES[0]
+export function getCategoryMeta(contentTypeId) {
+  const category = CATEGORIES.find((item) => item.id === contentTypeId) ?? CATEGORIES[0]
 
   return {
     ...category,

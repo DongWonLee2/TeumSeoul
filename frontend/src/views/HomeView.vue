@@ -3,7 +3,12 @@ import { computed, ref } from 'vue'
 import FilterChips from '../components/FilterChips.vue'
 import LeafletMap from '../components/LeafletMap.vue'
 import PlaceCard from '../components/PlaceCard.vue'
-import { CATEGORIES, PLACES, SEOUL_DISTRICTS } from '../data/places.js'
+import { PLACES } from '../data/places.js'
+
+defineProps({
+  categories: { type: Array, required: true },
+  districts: { type: Array, required: true },
+})
 
 const emit = defineEmits(['open-place', 'show-map'])
 const searchQuery = ref('')
@@ -13,12 +18,12 @@ const activeDistrict = ref('all')
 const filteredPlaces = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
   return PLACES.filter((place) => {
-    const categoryMatches = activeCategory.value === 'all' || place.category === activeCategory.value
+    const categoryMatches = activeCategory.value === 'all' || place.content_type_id === activeCategory.value
     const districtMatches = activeDistrict.value === 'all' || place.district === activeDistrict.value
     const queryMatches = !query
       || place.title.toLowerCase().includes(query)
-      || place.district.toLowerCase().includes(query)
-      || place.address.toLowerCase().includes(query)
+      || (place.district || '').toLowerCase().includes(query)
+      || (place.address || '').toLowerCase().includes(query)
     return categoryMatches && districtMatches && queryMatches
   })
 })
@@ -27,8 +32,8 @@ const filteredPlaces = computed(() => {
 <template>
   <FilterChips
     v-model:search-query="searchQuery"
-    :categories="CATEGORIES"
-    :districts="SEOUL_DISTRICTS"
+    :categories="categories"
+    :districts="districts"
     :active-category="activeCategory"
     :active-district="activeDistrict"
     @select-category="activeCategory = $event"
@@ -57,6 +62,10 @@ const filteredPlaces = computed(() => {
       </div>
     </section>
 
-    <LeafletMap :places="filteredPlaces" @open-place="emit('open-place', $event)" />
+    <LeafletMap
+      :places="filteredPlaces"
+      :categories="categories"
+      @open-place="emit('open-place', $event)"
+    />
   </main>
 </template>
