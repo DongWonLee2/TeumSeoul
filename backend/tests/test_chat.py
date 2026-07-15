@@ -285,7 +285,8 @@ def test_openai_structured_output_uses_bounded_redacted_evidence(monkeypatch) ->
     request = captured["request"]
     assert request["model"] == "gpt-5-mini"
     assert request["text_format"] is AIChatOutput
-    assert request["max_output_tokens"] == 1200
+    assert request["reasoning"] == {"effort": "low"}
+    assert request["max_output_tokens"] == 3000
     assert request["store"] is False
     serialized_input = str(request["input"])
     assert "sk-history-secret" not in serialized_input
