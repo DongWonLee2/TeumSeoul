@@ -277,6 +277,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid color-mix(in oklc
   .map-page { padding: 18px 16px; }
   .map-legend { max-height: 118px; overflow: hidden; }
   .community-preview-card { width: 100%; }
+  .chat-panel { inset: 0 !important; width: 100% !important; height: 100% !important; max-width: 100% !important; max-height: 100% !important; border-radius: 0; }
+  .chat-resize-handle { display: none; }
 }
 
 @media (max-width: 1100px) {
