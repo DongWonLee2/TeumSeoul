@@ -17,7 +17,7 @@ let map
 const mapStyle = computed(() => ({ minHeight: props.height }))
 
 function markerIcon(place) {
-  const meta = getCategoryMeta(place.category)
+  const meta = getCategoryMeta(place.content_type_id)
   return L.divIcon({
     className: 'teum-marker-wrapper',
     html: `<span class="teum-marker" style="background:${meta.dot}"></span>`,
@@ -73,9 +73,9 @@ onBeforeUnmount(() => {
   <div class="map-frame" :style="mapStyle">
     <div ref="mapElement" class="leaflet-map" />
     <div class="map-legend">
-      <div v-for="category in CATEGORIES" :key="category.key">
-        <span :style="{ background: getCategoryMeta(category.key).dot }" />
-        {{ category.label }}
+      <div v-for="category in CATEGORIES" :key="category.id">
+        <span :style="{ background: getCategoryMeta(category.id).dot }" />
+        {{ category.name }}
       </div>
     </div>
   </div>

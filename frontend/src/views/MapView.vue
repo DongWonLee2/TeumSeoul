@@ -14,7 +14,7 @@ const activeDistrict = ref('all')
 const filteredPlaces = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
   return PLACES.filter((place) => {
-    const categoryMatches = activeCategory.value === 'all' || place.category === activeCategory.value
+    const categoryMatches = activeCategory.value === 'all' || place.content_type_id === activeCategory.value
     const districtMatches = activeDistrict.value === 'all' || place.district === activeDistrict.value
     const queryMatches = !query
       || place.title.toLowerCase().includes(query)
