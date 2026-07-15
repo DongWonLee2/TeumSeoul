@@ -7,6 +7,7 @@ import PostDetailView from './PostDetailView.vue'
 import { SEOUL_DISTRICTS } from '../data/places.js'
 import { getMapLocations } from '../api/locations.js'
 import { createPost, deletePost, getPostDetail, getPosts, updatePost } from '../api/posts.js'
+import { formatPostTime } from '../utils/datetime.js'
 
 const props = defineProps({
   categories: { type: Array, required: true },
@@ -29,6 +30,21 @@ const WRITE_CATEGORIES = [
   { label: '현장 제보', key: 'report' },
   { label: '방문 후기', key: 'review' },
 ]
+
+const STATUS_TAG_COLOR_CLASS = {
+  '혼잡': 'status-tag-crowded',
+  '여유': 'status-tag-relaxed',
+  '공사': 'status-tag-construction',
+}
+
+function statusTagClass(label) {
+  return STATUS_TAG_COLOR_CLASS[label] || ''
+}
+
+const STATUS_TAGS_BY_CATEGORY = {
+  report: ['crowded', 'relaxed', 'construction'],
+  review: ['caution', 'photo', 'family', 'solo'],
+}
 
 const communityCats = ref([
   { label: '전체', key: 'all' },
@@ -70,6 +86,10 @@ const writePlaces = ref([])
 const writeMapBounds = ref(null)
 const writeMapLoading = ref(false)
 const writeSubmitLabel = ref('등록')
+const availableStatusTags = computed(() => {
+  const allowedKeys = STATUS_TAGS_BY_CATEGORY[selectedWriteCategory.value] || []
+  return WRITE_STATUS_TAGS.filter((tag) => allowedKeys.includes(tag.key))
+})
 const titleLength = computed(() => draftTitle.value.trim().length)
 const bodyLength = computed(() => draftBody.value.trim().length)
 const passwordLength = computed(() => draftPassword.value.trim().length)
@@ -104,9 +124,7 @@ function normalizeApiPost(post) {
     title: post.title,
     body: post.content,
     author: '익명',
-    time: post.created_at
-      ? new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(post.created_at))
-      : '',
+    time: formatPostTime(post.created_at),
     views: post.view_count,
     placeName: post.location?.title || '장소 미지정',
     statusTags: post.status_tag ? [post.status_tag] : [],
@@ -120,6 +138,7 @@ async function loadPostFromRoute(postId) {
     postError.value = ''
     return
   }
+  isWrite.value = false
   const currentController = new AbortController()
   postRequestController = currentController
   selectedPost.value = null
@@ -189,14 +208,20 @@ async function openPost(post) {
 
 function toggleStatusTag(tagKey) {
   if (selectedStatusTags.value.includes(tagKey)) {
-    selectedStatusTags.value = selectedStatusTags.value.filter((key) => key !== tagKey)
+    selectedStatusTags.value = []
     return
   }
-  selectedStatusTags.value = [...selectedStatusTags.value, tagKey]
+  if (selectedStatusTags.value.length > 0) {
+    alert('상태 태그는 1개만 선택할 수 있어요.')
+    return
+  }
+  selectedStatusTags.value = [tagKey]
 }
 
 function selectWriteCategory(key) {
   selectedWriteCategory.value = key
+  const allowedKeys = STATUS_TAGS_BY_CATEGORY[key] || []
+  selectedStatusTags.value = selectedStatusTags.value.filter((tagKey) => allowedKeys.includes(tagKey))
 }
 
 function handleWritePlaceSelect(place) {
@@ -220,13 +245,6 @@ async function loadWriteMapPlaces() {
 function onWriteMapBoundsChange(bounds) {
   writeMapBounds.value = bounds
   loadWriteMapPlaces()
-}
-
-function formatPostTime(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 function mapPostFromApi(item) {
@@ -273,8 +291,7 @@ function goPage(n) {
   loadPosts()
 }
 
-function setCommunitySearchQuery(e) {
-  communitySearchQuery.value = e.target.value
+function applyCommunitySearch() {
   currentPage.value = 1
   loadPosts()
 }
@@ -422,10 +439,10 @@ onMounted(() => {
           />
 
           <div>
-            <div class="community-write-section-label">상태 태그 선택 (선택, 복수 가능)</div>
+            <div class="community-write-section-label">상태 태그 선택 (선택, 1개만 가능)</div>
             <div class="chip-row write-chip-row">
               <button
-                v-for="tag in WRITE_STATUS_TAGS"
+                v-for="tag in availableStatusTags"
                 :key="tag.key"
                 type="button"
                 class="write-chip"
@@ -528,11 +545,14 @@ onMounted(() => {
             <div class="post-header">
               <span class="post-category">{{ post.category }}</span>
               <span class="post-title">{{ post.title }}</span>
+              <span class="post-author-time">익명 · {{ post.time }}</span>
             </div>
-            <div class="post-meta">익명 · {{ post.time }} · 조회 {{ post.views }} · 📍 {{ post.placeName }}</div>
 
-            <div v-if="post.statusTags && post.statusTags.length" class="status-tags">
-              <span v-for="stg in post.statusTags" :key="stg" class="status-tag">{{ stg }}</span>
+            <div class="post-sub-row">
+              <div v-if="post.statusTags && post.statusTags.length" class="status-tags">
+                <span v-for="stg in post.statusTags" :key="stg" :class="['status-tag', statusTagClass(stg)]">{{ stg }}</span>
+              </div>
+              <span class="post-stats">조회 {{ post.views }} · 📍 {{ post.placeName }}</span>
             </div>
           </div>
         </div>
@@ -551,16 +571,15 @@ onMounted(() => {
         </button>
       </div>
 
-      <div class="search-container">
+      <form class="search-container" role="search" @submit.prevent="applyCommunitySearch">
         <input
+          v-model="communitySearchQuery"
           type="text"
           placeholder="게시글 제목 검색"
-          :value="communitySearchQuery"
-          @input="setCommunitySearchQuery"
           class="search-input"
         />
-        <span class="search-icon">🔍</span>
-      </div>
+        <button type="submit" class="search-icon" aria-label="검색">🔍</button>
+      </form>
     </template>
   </div>
 </template>

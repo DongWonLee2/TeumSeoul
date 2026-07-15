@@ -6,6 +6,7 @@ import LeafletMap from '../components/LeafletMap.vue'
 import PlaceCard from '../components/PlaceCard.vue'
 import { getLocations, getMapLocations } from '../api/locations.js'
 import { getPosts } from '../api/posts.js'
+import { formatPostTime } from '../utils/datetime.js'
 
 defineProps({
   categories: { type: Array, required: true },
@@ -130,7 +131,7 @@ async function loadCommunityPreview() {
       category: post.category,
       title: post.title,
       author: '익명',
-      time: post.created_at ? new Date(post.created_at).toLocaleDateString('ko-KR') : '',
+      time: formatPostTime(post.created_at),
       onClick: () => router.push({ name: 'community', query: { post: post.id } }),
     }))
   } catch (error) {
