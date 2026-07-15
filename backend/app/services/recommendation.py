@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 ValueT = TypeVar("ValueT")
 
 CANDIDATE_QUERY_LIMIT = 500
-MIN_LOCATION_CANDIDATES = 9
 COURSE_COUNT = 3
 COURSE_OPTION_LIMIT = 24
 EARTH_RADIUS_KM = 6371.0088
@@ -196,7 +195,7 @@ def recommend_situational(
     request: SituationalRecommendationRequest,
 ) -> SituationalRecommendationResponse:
     candidates, warnings = _build_candidate_pool(db, request)
-    applied_conditions = AppliedConditions(**request.model_dump(exclude={"current_location"}))
+    applied_conditions = AppliedConditions(**request.model_dump())
     if not candidates:
         return _empty_response(applied_conditions, warnings)
 
@@ -257,21 +256,17 @@ def _build_candidate_pool(
     request: SituationalRecommendationRequest,
 ) -> tuple[list[ScoredCandidate], list[str]]:
     content_type_ids = set(MOOD_CONTENT_TYPES[request.mood])
+    latitude = request.current_location.latitude if request.current_location else None
+    longitude = request.current_location.longitude if request.current_location else None
     locations = find_recommendation_candidates(
         db,
         content_type_ids=content_type_ids,
         district=request.district,
+        latitude=latitude,
+        longitude=longitude,
         limit=CANDIDATE_QUERY_LIMIT,
     )
     warnings: list[str] = []
-    if len(locations) < MIN_LOCATION_CANDIDATES and request.district:
-        locations = find_recommendation_candidates(
-            db,
-            content_type_ids=content_type_ids,
-            district=None,
-            limit=CANDIDATE_QUERY_LIMIT,
-        )
-        warnings.append("희망 지역의 후보가 부족해 서울 전체로 조건을 완화했습니다.")
 
     scored: list[ScoredCandidate] = []
     for location in locations:

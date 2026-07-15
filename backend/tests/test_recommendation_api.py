@@ -11,6 +11,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.location import Location
+from app.repositories.location import find_recommendation_candidates
 from app.schemas.recommendation import (
     AICourse,
     AICourseSelection,
@@ -74,43 +75,56 @@ def client() -> Iterator[TestClient]:
     "payload",
     [
         {
+            "recommendation_mode": "district",
             "available_minutes": 120,
             "companion": "friends",
             "mood": "culture",
             "district": "종로구",
         },
         {
+            "recommendation_mode": "district",
             "available_minutes": 60,
             "companion": "solo",
             "mood": "shopping",
             "district": "강남구",
         },
         {
+            "recommendation_mode": "district",
             "available_minutes": 240,
             "companion": "couple",
             "mood": "healing",
             "district": "마포구",
         },
         {
+            "recommendation_mode": "district",
             "available_minutes": 120,
             "companion": "family",
             "mood": "activity",
             "district": "송파구",
         },
-        {"available_minutes": 30, "companion": "solo", "mood": "culture"},
         {
+            "recommendation_mode": "nearby",
+            "available_minutes": 30,
+            "companion": "solo",
+            "mood": "culture",
+            "current_location": {"latitude": 37.50, "longitude": 126.956},
+        },
+        {
+            "recommendation_mode": "district",
             "available_minutes": 60,
             "companion": "couple",
             "mood": "night_view",
             "district": "종로구",
         },
         {
+            "recommendation_mode": "district",
             "available_minutes": 120,
             "companion": "family",
             "mood": "healing",
             "district": "강남구",
         },
         {
+            "recommendation_mode": "district",
             "available_minutes": 240,
             "companion": "friends",
             "mood": "shopping",
@@ -126,9 +140,17 @@ def test_recommendation_rule_fallback_supports_representative_conditions(
 
     assert response.status_code == 200
     body = response.json()
-    assert body["meta"]["count"] == 3
+    assert 1 <= body["meta"]["count"] <= 3
     assert body["meta"]["fallback"] is True
-    assert len(body["data"]["recommendations"]) == 3
+    assert len(body["data"]["recommendations"]) == body["meta"]["count"]
+    applied = body["data"]["applied_conditions"]
+    assert applied["recommendation_mode"] == payload["recommendation_mode"]
+    if payload["recommendation_mode"] == "nearby":
+        assert applied["district"] is None
+        assert applied["current_location"] == payload["current_location"]
+    else:
+        assert applied["district"] == payload["district"]
+        assert applied["current_location"] is None
     all_ids: list[int] = []
     for course in body["data"]["recommendations"]:
         assert course["estimated_duration_minutes"] <= payload["available_minutes"]
@@ -172,7 +194,13 @@ def test_recommendation_uses_valid_openai_selection(
     )
     response = client.post(
         "/api/recommend/situational",
-        json={"available_minutes": 60, "companion": "friends", "mood": "culture"},
+        json={
+            "recommendation_mode": "district",
+            "available_minutes": 60,
+            "companion": "friends",
+            "mood": "culture",
+            "district": "종로구",
+        },
     )
 
     assert response.status_code == 200
@@ -212,7 +240,13 @@ def test_recommendation_rejects_hallucinated_openai_ids(
     )
     response = client.post(
         "/api/recommend/situational",
-        json={"available_minutes": 60, "companion": "friends", "mood": "culture"},
+        json={
+            "recommendation_mode": "district",
+            "available_minutes": 60,
+            "companion": "friends",
+            "mood": "culture",
+            "district": "종로구",
+        },
     )
 
     assert response.status_code == 200
@@ -227,10 +261,10 @@ def test_recommendation_rejects_hallucinated_openai_ids(
 
 def test_culture_courses_balance_museum_time_diversity_and_distance() -> None:
     request = SituationalRecommendationRequest(
+        recommendation_mode="nearby",
         available_minutes=120,
         companion="friends",
         mood="culture",
-        district="종로구",
         current_location={"latitude": 37.575, "longitude": 126.98},
     )
     definitions = [
@@ -292,23 +326,153 @@ def test_shopping_and_activity_candidates_exclude_museum_experience() -> None:
     assert "museum_art" not in recommendation_service.MOOD_EXPERIENCE_TYPES["activity"]
 
 
+def test_nearby_candidate_query_prioritizes_current_location() -> None:
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add_all(
+            [
+                _location(
+                    source_content_id="nearby-old",
+                    content_type_id=12,
+                    title="현재 위치 근처",
+                    district="종로구",
+                    latitude=37.5751,
+                    longitude=126.9801,
+                    source_modified_at=datetime(2023, 1, 1),
+                ),
+                _location(
+                    source_content_id="distant-new",
+                    content_type_id=12,
+                    title="현재 위치에서 먼 장소",
+                    district="강남구",
+                    latitude=37.50,
+                    longitude=127.10,
+                    source_modified_at=datetime(2026, 1, 1),
+                ),
+            ]
+        )
+        db.commit()
+
+        locations = find_recommendation_candidates(
+            db,
+            content_type_ids={12},
+            district=None,
+            latitude=37.575,
+            longitude=126.98,
+            limit=1,
+        )
+
+    assert [location.title for location in locations] == ["현재 위치 근처"]
+
+
+def test_nearby_mode_includes_access_travel_but_district_mode_does_not() -> None:
+    location = _location(
+        id=1,
+        source_content_id="travel-mode",
+        content_type_id=12,
+        title="이동시간 비교 장소",
+        district="종로구",
+        latitude=37.585,
+        longitude=126.99,
+    )
+    candidate = recommendation_service.ScoredCandidate(
+        location=location,
+        score=50,
+        experience_type="general_attraction",
+        visit_minutes=30,
+    )
+    nearby_request = SituationalRecommendationRequest(
+        recommendation_mode="nearby",
+        available_minutes=60,
+        companion="solo",
+        mood="healing",
+        current_location={"latitude": 37.575, "longitude": 126.98},
+    )
+    district_request = SituationalRecommendationRequest(
+        recommendation_mode="district",
+        available_minutes=60,
+        companion="solo",
+        mood="healing",
+        district="종로구",
+    )
+
+    nearby_travel, _ = recommendation_service._estimate_travel(
+        (candidate,), nearby_request
+    )
+    district_travel, _ = recommendation_service._estimate_travel(
+        (candidate,), district_request
+    )
+
+    assert nearby_travel > 0
+    assert district_travel == 0
+
+
 @pytest.mark.parametrize(
     "payload",
     [
-        {"available_minutes": 45, "companion": "friends", "mood": "culture"},
-        {"available_minutes": 60, "companion": "team", "mood": "culture"},
-        {"available_minutes": 60, "companion": "friends", "mood": "food"},
         {
+            "recommendation_mode": "district",
+            "available_minutes": 45,
+            "companion": "friends",
+            "mood": "culture",
+            "district": "종로구",
+        },
+        {
+            "recommendation_mode": "district",
+            "available_minutes": 60,
+            "companion": "team",
+            "mood": "culture",
+            "district": "종로구",
+        },
+        {
+            "recommendation_mode": "district",
+            "available_minutes": 60,
+            "companion": "friends",
+            "mood": "food",
+            "district": "종로구",
+        },
+        {
+            "recommendation_mode": "district",
             "available_minutes": 60,
             "companion": "friends",
             "mood": "culture",
             "district": "부산진구",
         },
         {
+            "recommendation_mode": "nearby",
             "available_minutes": 60,
             "companion": "friends",
             "mood": "culture",
             "current_location": {"latitude": 100, "longitude": 126.98},
+        },
+        {
+            "recommendation_mode": "nearby",
+            "available_minutes": 60,
+            "companion": "friends",
+            "mood": "culture",
+        },
+        {
+            "recommendation_mode": "nearby",
+            "available_minutes": 60,
+            "companion": "friends",
+            "mood": "culture",
+            "district": "종로구",
+            "current_location": {"latitude": 37.575, "longitude": 126.98},
+        },
+        {
+            "recommendation_mode": "district",
+            "available_minutes": 60,
+            "companion": "friends",
+            "mood": "culture",
+        },
+        {
+            "recommendation_mode": "district",
+            "available_minutes": 60,
+            "companion": "friends",
+            "mood": "culture",
+            "district": "종로구",
+            "current_location": {"latitude": 37.575, "longitude": 126.98},
         },
     ],
 )
@@ -329,9 +493,11 @@ def test_recommendation_returns_empty_result_without_candidates() -> None:
         response = recommendation_service.recommend_situational(
             db,
             SituationalRecommendationRequest(
+                recommendation_mode="district",
                 available_minutes=60,
                 companion="solo",
                 mood="culture",
+                district="종로구",
             ),
         )
 
@@ -347,6 +513,7 @@ def test_recommendation_openapi_has_korean_description(client: TestClient) -> No
     operation = response.json()["paths"]["/api/recommend/situational"]["post"]
     assert operation["tags"] == ["상황형 추천"]
     assert operation["summary"] == "상황형 서울 여행코스 추천"
+    assert "nearby 모드는 현재 위치 주변" in operation["description"]
     assert "서버가 선택한 검증 코스로 자동 전환" in operation["description"]
 
 
