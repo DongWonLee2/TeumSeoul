@@ -18,6 +18,7 @@ const systemError = ref('')
 const selectedPlace = ref(null)
 const placeLoading = ref(false)
 const placeError = ref('')
+const activeView = ref(null)
 let detailRequestId = 0
 
 const currentView = computed(() => route.meta.section || 'home')
@@ -29,6 +30,7 @@ function navigate(view) {
 }
 
 function openPlace(place) {
+  if (currentView.value === 'map') activeView.value?.focusSelectedPlace?.(place)
   const routeName = currentView.value === 'map' ? 'map-place-detail' : 'place-detail'
   router.push({ name: routeName, params: { id: place.id } })
 }
@@ -93,6 +95,7 @@ onMounted(async () => {
 
     <RouterView v-slot="{ Component }">
       <component
+        ref="activeView"
         :is="Component"
         :categories="categories"
         :districts="districts"
@@ -110,6 +113,11 @@ onMounted(async () => {
         <button type="button" @click="closePlace">닫기</button>
       </div>
     </div>
-    <PlaceModal v-else-if="isPlaceRoute && selectedPlace" :place="selectedPlace" @close="closePlace" />
+    <PlaceModal
+      v-else-if="isPlaceRoute && selectedPlace"
+      :place="selectedPlace"
+      @close="closePlace"
+      @open-place="openPlace"
+    />
   </div>
 </template>
