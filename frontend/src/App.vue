@@ -1,7 +1,9 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
+import { placeDetailRouteName } from './router/index.js'
 import AppHeader from './components/AppHeader.vue'
+import ChatBot from './components/ChatBot.vue'
 import PlaceModal from './components/PlaceModal.vue'
 
 import { getLocationDetail } from './api/locations.js'
@@ -31,12 +33,11 @@ function navigate(view) {
 
 function openPlace(place) {
   if (currentView.value === 'map') activeView.value?.focusSelectedPlace?.(place)
-  const routeName = currentView.value === 'map' ? 'map-place-detail' : 'place-detail'
-  router.push({ name: routeName, params: { id: place.id } })
+  router.push({ name: placeDetailRouteName(currentView.value), params: { id: place.id } })
 }
 
 function closePlace() {
-  router.push({ name: currentView.value === 'map' ? 'map' : 'home' })
+  router.push({ name: currentView.value })
 }
 
 function openPost(post) {
@@ -124,5 +125,7 @@ onMounted(async () => {
       @open-place="openPlace"
       @open-post="openPost"
     />
+
+    <ChatBot />
   </div>
 </template>
