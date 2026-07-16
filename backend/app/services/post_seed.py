@@ -2,12 +2,18 @@ import json
 import secrets
 from datetime import date, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.constants import (
+    POST_CATEGORIES,
+    POST_STATUS_TAGS,
+    POST_STATUS_TAGS_BY_CATEGORY,
+    is_valid_post_category_status,
+)
 from app.models.location import Location
 from app.models.post import Post
 from app.schemas.post import PostCategory, PostStatusTag
@@ -32,6 +38,12 @@ class PostSeedRecord(BaseModel):
     view_count: int = Field(ge=0)
     created_at: datetime
 
+    @model_validator(mode="after")
+    def validate_category_status_contract(self) -> Self:
+        if not is_valid_post_category_status(self.category, self.status_tag):
+            raise ValueError("게시글 카테고리와 상태 태그 조합이 올바르지 않습니다.")
+        return self
+
 
 class PostSeedPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -43,6 +55,33 @@ class PostSeedPayload(BaseModel):
 
 def get_post_count(db: Session) -> int:
     return int(db.scalar(select(func.count()).select_from(Post)) or 0)
+
+
+def normalize_existing_post_contracts(db: Session) -> int:
+    """기존 게시글을 현재 카테고리별 상태 태그 계약에 맞게 정규화합니다."""
+    changed_count = 0
+    for post in db.scalars(select(Post)).all():
+        category = post.category
+        status_tag = post.status_tag
+
+        if status_tag not in POST_STATUS_TAGS:
+            status_tag = None
+        if category not in POST_CATEGORIES or not is_valid_post_category_status(
+            category, status_tag
+        ):
+            if status_tag in POST_STATUS_TAGS_BY_CATEGORY["현장 제보"]:
+                category = "현장 제보"
+            else:
+                category = "방문 후기"
+
+        if post.category != category or post.status_tag != status_tag:
+            post.category = category
+            post.status_tag = status_tag
+            changed_count += 1
+
+    if changed_count:
+        db.commit()
+    return changed_count
 
 
 def load_post_seed_records(path: Path) -> list[PostSeedRecord]:

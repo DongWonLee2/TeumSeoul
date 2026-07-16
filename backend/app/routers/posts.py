@@ -3,7 +3,11 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Body, Depends, Path, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.core.constants import POST_CATEGORIES, POST_STATUS_TAGS
+from app.core.constants import (
+    POST_CATEGORIES,
+    POST_STATUS_TAGS,
+    is_valid_post_category_status,
+)
 from app.core.exceptions import AppException
 from app.db.session import get_db
 from app.schemas.common import DataResponse
@@ -74,6 +78,12 @@ def list_posts(
         raise AppException(422, "허용되지 않은 게시글 카테고리입니다.", "INVALID_QUERY_PARAMETER")
     if status_tag is not None and status_tag not in POST_STATUS_TAGS:
         raise AppException(422, "허용되지 않은 상태 태그입니다.", "INVALID_QUERY_PARAMETER")
+    if category is not None and not is_valid_post_category_status(category, status_tag):
+        raise AppException(
+            422,
+            "게시글 카테고리와 상태 태그 조합이 올바르지 않습니다.",
+            "INVALID_QUERY_PARAMETER",
+        )
     posts, meta = post_service.list_posts(
         db,
         q=q,

@@ -187,7 +187,20 @@ def test_metadata_returns_shared_options_and_actual_districts(client: TestClient
         38,
     ]
     assert data["districts"] == ["강남구", "성동구"]
-    assert data["post_categories"] == ["현장 제보", "방문 후기", "질문", "추천"]
+    assert data["post_categories"] == ["현장 제보", "방문 후기"]
+    assert data["status_tags"] == [
+        "혼잡",
+        "여유",
+        "공사",
+        "이용 주의",
+        "사진 추천",
+        "가족 추천",
+        "혼자 추천",
+    ]
+    assert data["status_tags_by_category"] == {
+        "현장 제보": ["혼잡", "여유", "공사"],
+        "방문 후기": ["이용 주의", "사진 추천", "가족 추천", "혼자 추천"],
+    }
     assert data["recommendation_options"] == {
         "available_minutes": [30, 60, 120, 240],
         "companions": ["solo", "couple", "friends", "family"],

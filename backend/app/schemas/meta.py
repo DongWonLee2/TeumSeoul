@@ -20,4 +20,7 @@ class Metadata(APIModel):
     districts: list[str] = Field(description="현재 장소 데이터에 존재하는 서울 자치구")
     post_categories: list[str] = Field(description="게시글 작성 시 선택 가능한 카테고리")
     status_tags: list[str] = Field(description="게시글 현장 상태 태그")
+    status_tags_by_category: dict[str, list[str]] = Field(
+        description="게시글 카테고리별 선택 가능한 상태 태그"
+    )
     recommendation_options: RecommendationOptions = Field(description="상황형 추천 입력 옵션")

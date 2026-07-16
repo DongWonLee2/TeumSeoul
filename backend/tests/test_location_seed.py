@@ -80,8 +80,8 @@ def test_location_startup_removes_excluded_location_from_existing_db() -> None:
         db.flush()
         linked_post = Post(
             location_id=excluded_location.id,
-            category="질문",
-            status_tag=None,
+            category="현장 제보",
+            status_tag="혼잡",
             title="제외 장소 연결 게시글",
             content="장소가 제외되어도 게시글은 유지됩니다.",
             password="1234",
