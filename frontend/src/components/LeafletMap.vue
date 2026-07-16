@@ -64,7 +64,11 @@ function renderMarkers() {
 
   validPlaces.forEach((place, index) => {
     const marker = L.marker([place.latitude, place.longitude], { icon: markerIcon(place) })
-      .bindTooltip(place.title, { direction: 'top', offset: [0, -24] })
+      .bindTooltip(place.title, {
+        direction: 'top',
+        offset: [0, -24],
+        className: 'teum-place-tooltip',
+      })
       .on('click', () => emit('open-place', place))
     if (clusterIndexes.has(index)) {
       clusterLayer.addLayer(marker)

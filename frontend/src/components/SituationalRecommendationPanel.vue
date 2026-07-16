@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { getSituationalRecommendations } from '../api/recommendations.js'
 import { getCategoryMeta } from '../utils/category.js'
 
@@ -18,10 +18,13 @@ const district = ref(props.districts[0] || '')
 const currentLocation = ref(null)
 const locationStatus = ref('idle')
 const locationError = ref('')
+const districtOpen = ref(false)
+const districtDropdown = ref(null)
 const loading = ref(false)
 const error = ref('')
 const result = ref(null)
 let controller
+const MAX_LOCATION_ACCURACY_METERS = 1000
 
 const times = [
   { value: 30, label: '30분' },
@@ -61,6 +64,16 @@ const contentTypeIds = {
 }
 
 const recommendations = computed(() => result.value?.data?.recommendations || [])
+
+function selectDistrict(item) {
+  district.value = item
+  districtOpen.value = false
+}
+
+function closeDistrictOnOutsideClick(event) {
+  if (!districtDropdown.value?.contains(event.target)) districtOpen.value = false
+}
+
 function requestLocation() {
   locationError.value = ''
   if (!navigator.geolocation) {
@@ -71,6 +84,13 @@ function requestLocation() {
   locationStatus.value = 'requesting'
   navigator.geolocation.getCurrentPosition(
     ({ coords }) => {
+      if (!Number.isFinite(coords.accuracy) || coords.accuracy > MAX_LOCATION_ACCURACY_METERS) {
+        currentLocation.value = null
+        locationStatus.value = 'inaccurate'
+        locationError.value = '현재 위치가 너무 부정확해요. 지역을 직접 선택해 주세요.'
+        mode.value = 'district'
+        return
+      }
       currentLocation.value = { latitude: coords.latitude, longitude: coords.longitude }
       locationStatus.value = 'granted'
     },
@@ -80,7 +100,7 @@ function requestLocation() {
         ? '위치 권한이 거부됐어요. 지역 선택 추천을 이용해 주세요.'
         : '현재 위치를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.'
     },
-    { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
   )
 }
 
@@ -146,7 +166,11 @@ function categoryStyle(location) {
   return { background: meta.bg, color: meta.fg }
 }
 
-onBeforeUnmount(() => controller?.abort())
+onMounted(() => document.addEventListener('pointerdown', closeDistrictOnOutsideClick))
+onBeforeUnmount(() => {
+  controller?.abort()
+  document.removeEventListener('pointerdown', closeDistrictOnOutsideClick)
+})
 </script>
 
 <template>
@@ -170,11 +194,34 @@ onBeforeUnmount(() => controller?.abort())
           <button type="button" :disabled="locationStatus === 'requesting'" @click="requestLocation">
             {{ locationStatus === 'granted' ? '✓ 현재 위치 확인됨' : locationStatus === 'requesting' ? '위치 확인 중…' : '📍 현재 위치 사용하기' }}
           </button>
-          <p v-if="locationError">{{ locationError }}</p>
         </div>
-        <select v-else v-model="district" class="recommend-select" aria-label="추천 지역">
-          <option v-for="item in districts" :key="item" :value="item">{{ item }}</option>
-        </select>
+        <div v-else ref="districtDropdown" class="recommend-dropdown" :class="{ open: districtOpen }">
+          <button
+            type="button"
+            class="recommend-dropdown-trigger"
+            aria-haspopup="listbox"
+            :aria-expanded="districtOpen"
+            @click="districtOpen = !districtOpen"
+            @keydown.esc="districtOpen = false"
+          >
+            <span>{{ district }}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+          </button>
+          <div v-if="districtOpen" class="recommend-dropdown-menu" role="listbox" aria-label="추천 지역">
+            <button
+              v-for="item in districts"
+              :key="item"
+              type="button"
+              role="option"
+              :aria-selected="district === item"
+              :class="{ selected: district === item }"
+              @click="selectDistrict(item)"
+            >
+              {{ item }}
+            </button>
+          </div>
+        </div>
+        <p v-if="locationError" class="location-guidance" role="status">{{ locationError }}</p>
       </fieldset>
 
       <fieldset>
