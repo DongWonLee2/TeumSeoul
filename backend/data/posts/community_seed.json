@@ -1,0 +1,226 @@
+{
+  "version": 1,
+  "description": "배포 초기 커뮤니티 게시글",
+  "posts": [
+    {
+      "seed_key": "community-seed-001",
+      "location_source_content_id": "128611",
+      "category": "현장 제보",
+      "status_tag": "혼잡",
+      "title": "주말 오후 서울숲 방문 참고",
+      "content": "주말 오후에는 중앙 산책로와 주요 포토존 주변이 붐비는 편입니다. 조용하게 걷고 싶다면 오전 방문을 추천합니다.",
+      "visited_at": "2026-07-12",
+      "view_count": 38,
+      "created_at": "2026-07-12T06:20:00"
+    },
+    {
+      "seed_key": "community-seed-002",
+      "location_source_content_id": "128611",
+      "category": "방문 후기",
+      "status_tag": "사진 추천",
+      "title": "서울숲 산책 사진 포인트 추천해요",
+      "content": "연못 주변과 나무가 이어진 산책길이 사진 찍기 좋았습니다. 해가 강한 시간에는 그늘 구간을 따라 이동하기 좋습니다.",
+      "visited_at": "2026-07-10",
+      "view_count": 24,
+      "created_at": "2026-07-11T01:15:00"
+    },
+    {
+      "seed_key": "community-seed-003",
+      "location_source_content_id": "126508",
+      "category": "방문 후기",
+      "status_tag": "가족 추천",
+      "title": "가족과 천천히 둘러본 경복궁",
+      "content": "아이와 함께 천천히 둘러보니 한 시간 반 정도 걸렸습니다. 야외 이동이 많아 물을 준비하면 좋습니다.",
+      "visited_at": "2026-07-13",
+      "view_count": 51,
+      "created_at": "2026-07-13T08:40:00"
+    },
+    {
+      "seed_key": "community-seed-004",
+      "location_source_content_id": "126508",
+      "category": "방문 후기",
+      "status_tag": "가족 추천",
+      "title": "경복궁은 두 시간 정도 잡으면 여유로워요",
+      "content": "근처 박물관까지 함께 방문했는데 경복궁 관람에 두 시간 정도 잡으니 주요 구역을 여유 있게 둘러볼 수 있었습니다.",
+      "visited_at": null,
+      "view_count": 17,
+      "created_at": "2026-07-14T02:05:00"
+    },
+    {
+      "seed_key": "community-seed-005",
+      "location_source_content_id": "132183",
+      "category": "현장 제보",
+      "status_tag": "혼잡",
+      "title": "점심시간 광장시장 많이 붐비네요",
+      "content": "점심시간에는 인기 먹거리 매장 앞 대기 줄이 길었습니다. 여러 곳을 둘러보려면 식사 시간을 조금 피하는 편이 좋습니다.",
+      "visited_at": "2026-07-14",
+      "view_count": 46,
+      "created_at": "2026-07-14T04:10:00"
+    },
+    {
+      "seed_key": "community-seed-006",
+      "location_source_content_id": "132183",
+      "category": "방문 후기",
+      "status_tag": "이용 주의",
+      "title": "광장시장 방문 전에 참고하세요",
+      "content": "현금과 카드 사용 여부가 매장마다 다를 수 있어 결제 수단을 미리 준비하면 편합니다. 통로가 좁아 가벼운 짐을 추천합니다.",
+      "visited_at": "2026-07-11",
+      "view_count": 32,
+      "created_at": "2026-07-12T03:30:00"
+    },
+    {
+      "seed_key": "community-seed-007",
+      "location_source_content_id": "126535",
+      "category": "방문 후기",
+      "status_tag": "사진 추천",
+      "title": "남산서울타워에서 야경 보고 왔어요",
+      "content": "해가 지기 전에 도착해 낮 풍경과 야경을 모두 볼 수 있었습니다. 전망 구간은 바람이 강할 수 있어 겉옷이 있으면 좋습니다.",
+      "visited_at": "2026-07-13",
+      "view_count": 63,
+      "created_at": "2026-07-13T12:25:00"
+    },
+    {
+      "seed_key": "community-seed-008",
+      "location_source_content_id": "126535",
+      "category": "방문 후기",
+      "status_tag": "이용 주의",
+      "title": "남산 올라갈 때 대중교통이 편했어요",
+      "content": "저녁 시간에 방문해 보니 버스로 가까이 이동한 뒤 걷는 방법이 편했습니다. 주말에는 정류장 대기 시간을 고려하면 좋습니다.",
+      "visited_at": null,
+      "view_count": 21,
+      "created_at": "2026-07-15T00:45:00"
+    },
+    {
+      "seed_key": "community-seed-009",
+      "location_source_content_id": "129703",
+      "category": "현장 제보",
+      "status_tag": "여유",
+      "title": "평일 국립중앙박물관은 여유롭네요",
+      "content": "평일 오전에는 비교적 여유롭게 전시를 볼 수 있었습니다. 전시실이 많아 관심 있는 구역을 미리 정하면 좋습니다.",
+      "visited_at": "2026-07-09",
+      "view_count": 35,
+      "created_at": "2026-07-10T05:50:00"
+    },
+    {
+      "seed_key": "community-seed-010",
+      "location_source_content_id": "129703",
+      "category": "방문 후기",
+      "status_tag": "혼자 추천",
+      "title": "혼자 천천히 보기 좋은 국립중앙박물관",
+      "content": "관심 있는 전시를 자신의 속도로 둘러보기 좋아 혼자 방문하기 편했습니다. 최소 두 시간 정도 계획하는 것을 추천합니다.",
+      "visited_at": "2026-07-09",
+      "view_count": 29,
+      "created_at": "2026-07-10T07:10:00"
+    },
+    {
+      "seed_key": "community-seed-011",
+      "location_source_content_id": "126537",
+      "category": "방문 후기",
+      "status_tag": "이용 주의",
+      "title": "북촌에서는 조용히 관람하면 좋겠어요",
+      "content": "주거 지역과 가까운 골목이 많아 큰 소리로 대화하거나 길을 막지 않도록 주의가 필요합니다.",
+      "visited_at": "2026-07-12",
+      "view_count": 42,
+      "created_at": "2026-07-12T09:05:00"
+    },
+    {
+      "seed_key": "community-seed-012",
+      "location_source_content_id": "126537",
+      "category": "방문 후기",
+      "status_tag": "사진 추천",
+      "title": "북촌은 오전에 산책하기 좋았어요",
+      "content": "오전에는 골목이 비교적 한산해 천천히 둘러보기 좋았습니다. 주민 생활 공간을 배려하며 지정된 길을 이용하면 좋습니다.",
+      "visited_at": "2026-07-12",
+      "view_count": 37,
+      "created_at": "2026-07-12T10:20:00"
+    },
+    {
+      "seed_key": "community-seed-013",
+      "location_source_content_id": "1059479",
+      "category": "방문 후기",
+      "status_tag": "가족 추천",
+      "title": "가족과 여의도한강공원 저녁 산책",
+      "content": "해가 진 뒤 가족과 산책하기 좋았습니다. 자전거 도로와 보행 구간이 가까운 곳에서는 주변을 잘 살펴야 합니다.",
+      "visited_at": "2026-07-14",
+      "view_count": 55,
+      "created_at": "2026-07-14T12:40:00"
+    },
+    {
+      "seed_key": "community-seed-014",
+      "location_source_content_id": "1059479",
+      "category": "현장 제보",
+      "status_tag": "혼잡",
+      "title": "저녁에는 잔디광장 이용객이 많아요",
+      "content": "날씨가 좋은 저녁에는 잔디광장 주변 이용객이 많았습니다. 조용한 자리를 원한다면 중심 구역에서 조금 떨어진 곳이 좋습니다.",
+      "visited_at": "2026-07-14",
+      "view_count": 44,
+      "created_at": "2026-07-14T13:15:00"
+    },
+    {
+      "seed_key": "community-seed-015",
+      "location_source_content_id": "126509",
+      "category": "현장 제보",
+      "status_tag": "여유",
+      "title": "평일 오전 덕수궁 산책 후기",
+      "content": "평일 오전에 방문하니 비교적 여유롭게 둘러볼 수 있었습니다. 돌담길까지 함께 걷는 코스로 구성하기 좋았습니다.",
+      "visited_at": "2026-07-10",
+      "view_count": 28,
+      "created_at": "2026-07-10T03:35:00"
+    },
+    {
+      "seed_key": "community-seed-016",
+      "location_source_content_id": "126509",
+      "category": "방문 후기",
+      "status_tag": "혼자 추천",
+      "title": "덕수궁 관람 후 정동길까지 걷기 좋았어요",
+      "content": "덕수궁 관람을 마치고 정동길을 따라 걸으니 한두 시간 정도 더 여유롭게 둘러보기 좋았습니다.",
+      "visited_at": null,
+      "view_count": 13,
+      "created_at": "2026-07-15T02:30:00"
+    },
+    {
+      "seed_key": "community-seed-017",
+      "location_source_content_id": "129507",
+      "category": "방문 후기",
+      "status_tag": "혼자 추천",
+      "title": "청계천에서 가볍게 도심 산책했어요",
+      "content": "긴 일정 사이에 잠깐 걷기 좋은 코스였습니다. 출입구가 여러 곳이라 다음 목적지와 가까운 구간을 선택하기 좋습니다.",
+      "visited_at": "2026-07-11",
+      "view_count": 34,
+      "created_at": "2026-07-11T11:00:00"
+    },
+    {
+      "seed_key": "community-seed-018",
+      "location_source_content_id": "129507",
+      "category": "현장 제보",
+      "status_tag": "공사",
+      "title": "청계천 일부 구간 공사 중이네요",
+      "content": "일부 산책 구간에 임시 가림막이 설치되어 우회가 필요했습니다. 현장 안내 표지에 따라 다음 출입구로 이동하면 됩니다.",
+      "visited_at": "2026-07-13",
+      "view_count": 26,
+      "created_at": "2026-07-13T10:10:00"
+    },
+    {
+      "seed_key": "community-seed-019",
+      "location_source_content_id": "2470006",
+      "category": "방문 후기",
+      "status_tag": "사진 추천",
+      "title": "DDP는 야간에 방문하기 좋네요",
+      "content": "건물 외관과 조명이 어우러져 저녁에 사진 찍기 좋았습니다. 행사 여부에 따라 주변 동선이 달라질 수 있습니다.",
+      "visited_at": "2026-07-15",
+      "view_count": 61,
+      "created_at": "2026-07-15T12:05:00"
+    },
+    {
+      "seed_key": "community-seed-020",
+      "location_source_content_id": "2470006",
+      "category": "방문 후기",
+      "status_tag": "사진 추천",
+      "title": "DDP 전시와 주변 쇼핑은 세 시간이 적당했어요",
+      "content": "전시 관람과 주변 쇼핑까지 함께 둘러보니 세 시간 정도가 적당했습니다. 야간 조명이 켜진 뒤에는 사진도 남기기 좋았습니다.",
+      "visited_at": null,
+      "view_count": 19,
+      "created_at": "2026-07-16T00:20:00"
+    }
+  ]
+}

@@ -116,7 +116,7 @@ def test_chat_validates_ai_ids_and_returns_community_posts(chat_api) -> None:
     post = Post(
         location_id=location.id,
         category="방문 후기",
-        status_tag="여유",
+        status_tag="혼자 추천",
         title="최근 방문 팁",
         content="오전에는 비교적 여유로웠습니다.",
         password="1234",
@@ -267,7 +267,7 @@ def test_openai_structured_output_uses_bounded_redacted_evidence(monkeypatch) ->
         location_id=1,
         title="현장 후기",
         content="가" * 400,
-        status_tag="여유",
+        status_tag="혼자 추천",
     )
 
     output = generate_ai_output(

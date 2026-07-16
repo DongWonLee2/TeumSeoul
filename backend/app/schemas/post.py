@@ -1,13 +1,13 @@
 from datetime import date, datetime
 from html import escape
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import AfterValidator, Field, field_validator
+from pydantic import AfterValidator, Field, model_validator
 
-from app.core.constants import POST_CATEGORIES, POST_STATUS_TAGS
+from app.core.constants import is_valid_post_category_status
 from app.schemas.common import APIModel
 
-PostCategory = Literal["현장 제보", "방문 후기", "질문", "추천"]
+PostCategory = Literal["현장 제보", "방문 후기"]
 PostStatusTag = Literal[
     "혼잡",
     "여유",
@@ -64,7 +64,10 @@ class PostWriteFields(APIModel):
     category: PostCategory = Field(description="게시글 카테고리", examples=["현장 제보"])
     status_tag: PostStatusTag | None = Field(
         default=None,
-        description="선택 현장 상태 태그",
+        description=(
+            "선택 상태 태그. 현장 제보: 혼잡·여유·공사, "
+            "방문 후기: 이용 주의·사진 추천·가족 추천·혼자 추천"
+        ),
         examples=["혼잡"],
     )
     title: SafeTitle
@@ -75,19 +78,11 @@ class PostWriteFields(APIModel):
         examples=["2026-07-13"],
     )
 
-    @field_validator("category")
-    @classmethod
-    def validate_category_contract(cls, value: str) -> str:
-        if value not in POST_CATEGORIES:
-            raise ValueError("허용되지 않은 게시글 카테고리입니다.")
-        return value
-
-    @field_validator("status_tag")
-    @classmethod
-    def validate_status_tag_contract(cls, value: str | None) -> str | None:
-        if value is not None and value not in POST_STATUS_TAGS:
-            raise ValueError("허용되지 않은 상태 태그입니다.")
-        return value
+    @model_validator(mode="after")
+    def validate_category_status_contract(self) -> Self:
+        if not is_valid_post_category_status(self.category, self.status_tag):
+            raise ValueError("게시글 카테고리와 상태 태그 조합이 올바르지 않습니다.")
+        return self
 
 
 class PostCreate(PostWriteFields):
