@@ -10,6 +10,12 @@ import { SEOUL_DISTRICTS } from '../data/places.js'
 const route = useRoute()
 const router = useRouter()
 
+const AVAILABLE_MINUTE_OPTIONS = [
+  { value: 30, label: '30분' },
+  { value: 60, label: '1시간' },
+  { value: 120, label: '2시간' },
+  { value: 240, label: '반나절' },
+]
 const COMPANION_OPTIONS = [
   { value: 'solo', label: '혼자' },
   { value: 'couple', label: '커플' },
@@ -126,10 +132,22 @@ async function sendChatInput() {
 }
 
 function startRecommendationFlow(message) {
-  pendingRecommendation.value = { message, companion: null, mood: null, district: null }
+  pendingRecommendation.value = { message, availableMinutes: null, companion: null, mood: null, district: null }
   messages.value.push({
     isAi: true,
-    text: '추천을 위해 몇 가지 여쭤볼게요. 누구와 함께 하시나요?',
+    text: '추천을 위해 몇 가지 여쭤볼게요. 사용 가능한 시간은 얼마나 되시나요?',
+    quickReplies: AVAILABLE_MINUTE_OPTIONS,
+    onSelect: selectAvailableMinutes,
+  })
+}
+
+function selectAvailableMinutes(option, message) {
+  message.answered = true
+  pendingRecommendation.value.availableMinutes = option.value
+  messages.value.push({ isUser: true, text: option.label })
+  messages.value.push({
+    isAi: true,
+    text: '누구와 함께 하시나요?',
     quickReplies: COMPANION_OPTIONS,
     onSelect: selectCompanion,
   })
@@ -141,7 +159,7 @@ function selectCompanion(option, message) {
   messages.value.push({ isUser: true, text: option.label })
   messages.value.push({
     isAi: true,
-    text: '어떤 분위기를 원하세요?',
+    text: '어떤 분위기를 원하시나요?',
     quickReplies: MOOD_OPTIONS,
     onSelect: selectMood,
   })
@@ -167,6 +185,7 @@ async function selectDistrict(option, message) {
   const pending = pendingRecommendation.value
   pendingRecommendation.value = null
   await runChatQuery(pending.message, {
+    available_minutes: pending.availableMinutes,
     companion: pending.companion,
     mood: pending.mood,
     district: pending.district,
