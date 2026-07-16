@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.constants import CONTENT_TYPES
 from app.core.exceptions import AppException, ResourceNotFoundError
 from app.models.location import Location
+from app.models.post import Post
 from app.repositories.location import (
     LocationQuery,
     find_location_by_id,
@@ -64,6 +65,10 @@ def get_location_count(db: Session) -> int:
 
 
 def remove_excluded_locations(db: Session) -> int:
+    excluded_location_ids = select(Location.id).where(
+        Location.source_content_id.in_(EXCLUDED_SOURCE_CONTENT_IDS)
+    )
+    db.execute(delete(Post).where(Post.location_id.in_(excluded_location_ids)))
     result = db.execute(
         delete(Location).where(Location.source_content_id.in_(EXCLUDED_SOURCE_CONTENT_IDS))
     )

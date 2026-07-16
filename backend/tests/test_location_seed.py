@@ -98,4 +98,4 @@ def test_location_startup_removes_excluded_location_from_existing_db() -> None:
         assert db.scalar(
             select(Location.id).where(Location.source_content_id == "128933")
         ) is None
-        assert db.get(Post, linked_post_id).location_id is None
+        assert db.get(Post, linked_post_id) is None
