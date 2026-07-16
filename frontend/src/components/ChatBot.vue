@@ -68,6 +68,7 @@ const chatInputEl = ref(null)
 const chatBusy = ref(false)
 const chatError = ref('')
 const pendingRecommendation = ref(null)
+const savedContext = ref(null)
 const chatInputCounter = computed(() => `${Math.min(chatInput.value.length, CHAT_INPUT_MAX_LENGTH)}/${CHAT_INPUT_MAX_LENGTH}`)
 
 function autoResizeChatInput() {
@@ -145,21 +146,29 @@ async function sendChatInput() {
   nextTick(autoResizeChatInput)
   messages.value.push({ isUser: true, text: message })
 
-  if (message.includes('추천')) {
-    startRecommendationFlow(message)
-    return
-  }
-
   await runChatQuery(message)
 }
 
-function startRecommendationFlow(message) {
-  pendingRecommendation.value = { message, availableMinutes: null, companion: null, mood: null, district: null }
+function startSituationInput() {
+  if (chatBusy.value || pendingRecommendation.value) return
+  messages.value.push({ isUser: true, text: '현재 상황 저장하기', excludeFromHistory: true })
+  pendingRecommendation.value = { availableMinutes: null, companion: null, mood: null, district: null }
   messages.value.push({
     isAi: true,
-    text: '추천을 위해 몇 가지 여쭤볼게요. 사용 가능한 시간은 얼마나 되시나요?',
+    text: '사용 가능한 시간은 얼마나 되시나요?',
     quickReplies: AVAILABLE_MINUTE_OPTIONS,
     onSelect: selectAvailableMinutes,
+    excludeFromHistory: true,
+  })
+}
+
+function resetSituation() {
+  if (pendingRecommendation.value) return
+  savedContext.value = null
+  messages.value.push({ isUser: true, text: '현재 상황 초기화하기', excludeFromHistory: true })
+  messages.value.push({
+    isAi: true,
+    text: '현재 상황 정보를 초기화했어요. 필요하면 다시 입력해 주세요.',
     excludeFromHistory: true,
   })
 }
@@ -203,22 +212,27 @@ function selectMood(option, message) {
   })
 }
 
-async function selectDistrict(option, message) {
+function selectDistrict(option, message) {
   message.answered = true
   pendingRecommendation.value.district = option.value || undefined
   messages.value.push({ isUser: true, text: option.label, excludeFromHistory: true })
 
   const pending = pendingRecommendation.value
   pendingRecommendation.value = null
-  await runChatQuery(pending.message, {
+  savedContext.value = {
     available_minutes: pending.availableMinutes,
     companion: pending.companion,
     mood: pending.mood,
     district: pending.district,
+  }
+  messages.value.push({
+    isAi: true,
+    text: '현재 상황을 저장했어요. 이제 메시지를 보내면 이 정보를 반영해 답변해드릴게요.',
+    excludeFromHistory: true,
   })
 }
 
-async function runChatQuery(message, context) {
+async function runChatQuery(message) {
   chatBusy.value = true
   chatError.value = ''
 
@@ -229,7 +243,7 @@ async function runChatQuery(message, context) {
 
   try {
     const location = await getCurrentLocation()
-    const mergedContext = { ...context }
+    const mergedContext = { ...(savedContext.value || {}) }
     if (location) mergedContext.current_location = location
     const payload = {
       message,
@@ -355,6 +369,25 @@ async function runChatQuery(message, context) {
         </div>
 
         <div v-if="chatError" class="chat-error">{{ chatError }}</div>
+      </div>
+
+      <div class="chat-situation-row">
+        <button
+          type="button"
+          class="chat-situation-btn"
+          :disabled="chatBusy || !!pendingRecommendation"
+          @click="startSituationInput"
+        >
+          현재 상황 저장하기
+        </button>
+        <button
+          type="button"
+          class="chat-situation-btn"
+          :disabled="chatBusy || !!pendingRecommendation || !savedContext"
+          @click="resetSituation"
+        >
+          현재 상황 초기화하기
+        </button>
       </div>
 
       <div class="chat-input-row">
