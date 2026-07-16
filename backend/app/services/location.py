@@ -6,13 +6,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
 from app.core.constants import CONTENT_TYPES
 from app.core.exceptions import AppException, ResourceNotFoundError
 from app.models.location import Location
+from app.models.post import Post
 from app.repositories.location import (
     LocationQuery,
     find_location_by_id,
@@ -37,7 +38,12 @@ EXPECTED_CONTENT_TYPES = {
     32: ("숙박", 423),
     38: ("쇼핑", 4368),
 }
-EXPECTED_LOCATION_COUNT = sum(count for _, count in EXPECTED_CONTENT_TYPES.values())
+# 서비스 노출 제외가 합의된 원본 장소 ID (128933: 삼각산)
+EXCLUDED_SOURCE_CONTENT_IDS = frozenset({"128933"})
+EXPECTED_LOCATION_COUNT = (
+    sum(count for _, count in EXPECTED_CONTENT_TYPES.values())
+    - len(EXCLUDED_SOURCE_CONTENT_IDS)
+)
 SEOUL_LONGITUDE_RANGE = (126.0, 128.0)
 SEOUL_LATITUDE_RANGE = (37.0, 38.0)
 DISTRICT_PATTERN = re.compile(r"서울(?:특별시|특별)?\s+([가-힣]+구)(?:\s|$)")
@@ -58,10 +64,24 @@ def get_location_count(db: Session) -> int:
     return db.scalar(select(func.count()).select_from(Location)) or 0
 
 
+def remove_excluded_locations(db: Session) -> int:
+    excluded_location_ids = select(Location.id).where(
+        Location.source_content_id.in_(EXCLUDED_SOURCE_CONTENT_IDS)
+    )
+    db.execute(delete(Post).where(Post.location_id.in_(excluded_location_ids)))
+    result = db.execute(
+        delete(Location).where(Location.source_content_id.in_(EXCLUDED_SOURCE_CONTENT_IDS))
+    )
+    return max(result.rowcount or 0, 0)
+
+
 def seed_locations_if_needed(db: Session, data_dir: Path) -> bool:
     """데이터가 완전하면 건너뛰고, 아니면 전체 원본을 검증해 upsert합니다."""
+    removed_count = remove_excluded_locations(db)
     if get_location_count(db) == EXPECTED_LOCATION_COUNT:
-        return False
+        if removed_count:
+            db.commit()
+        return bool(removed_count)
 
     records = load_location_records(data_dir)
     seed_location_records(db, records)
@@ -113,6 +133,8 @@ def load_location_records(data_dir: Path) -> list[dict[str, Any]]:
                 raise LocationSeedError(
                     f"항목의 콘텐츠 유형이 일치하지 않습니다: {source_content_id}"
                 )
+            if source_content_id in EXCLUDED_SOURCE_CONTENT_IDS:
+                continue
             records.append(_normalize_location(item, content_type_id, path.name))
 
     if len(records) != EXPECTED_LOCATION_COUNT:
@@ -133,7 +155,13 @@ def seed_location_records(db: Session, records: list[dict[str, Any]]) -> None:
         set_=update_columns,
     )
     try:
-        for batch in _batched(records, UPSERT_BATCH_SIZE):
+        remove_excluded_locations(db)
+        included_records = [
+            record
+            for record in records
+            if record["source_content_id"] not in EXCLUDED_SOURCE_CONTENT_IDS
+        ]
+        for batch in _batched(included_records, UPSERT_BATCH_SIZE):
             db.execute(statement, batch)
         db.flush()
     except Exception:

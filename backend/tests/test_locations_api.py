@@ -203,7 +203,7 @@ def test_location_openapi_has_korean_collaboration_descriptions(client: TestClie
     operation = response.json()["paths"]["/api/locations"]["get"]
     assert operation["tags"] == ["장소"]
     assert operation["summary"] == "장소 목록 조회"
-    assert "서울 장소 6,518건" in operation["description"]
+    assert "서울 장소 6,517건" in operation["description"]
     parameters = {parameter["name"]: parameter for parameter in operation["parameters"]}
     assert parameters["q"]["description"] == "장소명·주소·자치구 검색어"
     assert parameters["size"]["description"] == "페이지당 결과 수(최대 100)"
