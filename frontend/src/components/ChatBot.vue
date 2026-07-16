@@ -36,6 +36,7 @@ const DISTRICT_OPTIONS = [
 
 const chatOpen = ref(false)
 const chatPanel = ref(null)
+const chatBody = ref(null)
 const panelWidth = ref(null)
 const panelHeight = ref(null)
 const panelStyle = computed(() => (
@@ -80,7 +81,13 @@ function autoResizeChatInput() {
 
 function toggleChat() {
   chatOpen.value = !chatOpen.value
-  if (!chatOpen.value) chatError.value = ''
+  if (!chatOpen.value) {
+    chatError.value = ''
+    return
+  }
+  nextTick(() => {
+    if (chatBody.value) chatBody.value.scrollTop = chatBody.value.scrollHeight
+  })
 }
 
 function startResize(event) {
@@ -251,7 +258,10 @@ async function runChatQuery(message, context) {
       title: post.title,
       placeName: postDetails[index]?.location?.title || '장소 미정',
       time: formatPostTime(postDetails[index]?.created_at),
-      onClick: () => router.push({ name: 'community', query: { post: post.post_id } }),
+      onClick: () => {
+        chatOpen.value = false
+        router.push({ name: 'community', query: { post: post.post_id } })
+      },
     }))
 
     messages.value.push({
@@ -285,7 +295,7 @@ async function runChatQuery(message, context) {
         <button class="chat-close" type="button" @click="toggleChat" aria-label="AI 챗봇 닫기">✕</button>
       </div>
 
-      <div class="chat-body">
+      <div ref="chatBody" class="chat-body">
         <div v-for="(message, index) in messages" :key="index" class="chat-message-row">
           <div v-if="message.isUser" class="chat-bubble chat-bubble-user">{{ message.text }}</div>
           <template v-else>
