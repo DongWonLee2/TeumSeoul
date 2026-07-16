@@ -29,9 +29,6 @@
 
 - API 문서: `backend/.docs`
 
-## 소개 영상
-![틈서울 서비스 소개 영상](<docs/TeumSeoul 소개영상.mp4>)
-
 
 ## 데이터 출처
 
