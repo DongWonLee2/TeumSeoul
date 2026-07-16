@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { placeDetailRouteName } from '../router/index.js'
 import { sendChatMessage } from '../api/chat.js'
@@ -57,12 +57,26 @@ const messages = ref([
   {
     isAi: true,
     text: '안녕하세요! 서울 곳곳을 더 쉽게 찾아드릴게요. 궁금한 장소나 분위기를 말씀해 주세요.',
+    excludeFromHistory: true,
   },
 ])
+const CHAT_INPUT_MAX_LENGTH = 1000
+const CHAT_INPUT_MAX_HEIGHT_RATIO = 0.25
 const chatInput = ref('')
+const chatInputEl = ref(null)
 const chatBusy = ref(false)
 const chatError = ref('')
 const pendingRecommendation = ref(null)
+const chatInputCounter = computed(() => `${Math.min(chatInput.value.length, CHAT_INPUT_MAX_LENGTH)}/${CHAT_INPUT_MAX_LENGTH}`)
+
+function autoResizeChatInput() {
+  const el = chatInputEl.value
+  if (!el) return
+  el.style.height = 'auto'
+  const panelHeight = chatPanel.value?.clientHeight || window.innerHeight
+  const maxHeight = panelHeight * CHAT_INPUT_MAX_HEIGHT_RATIO
+  el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`
+}
 
 function toggleChat() {
   chatOpen.value = !chatOpen.value
@@ -96,7 +110,7 @@ function stopResize() {
 onBeforeUnmount(stopResize)
 
 function onChatKeyDown(event) {
-  if (event.key === 'Enter') {
+  if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault()
     sendChatInput()
   }
@@ -121,6 +135,7 @@ async function sendChatInput() {
   if (!message || chatBusy.value || pendingRecommendation.value) return
 
   chatInput.value = ''
+  nextTick(autoResizeChatInput)
   messages.value.push({ isUser: true, text: message })
 
   if (message.includes('추천')) {
@@ -138,49 +153,53 @@ function startRecommendationFlow(message) {
     text: '추천을 위해 몇 가지 여쭤볼게요. 사용 가능한 시간은 얼마나 되시나요?',
     quickReplies: AVAILABLE_MINUTE_OPTIONS,
     onSelect: selectAvailableMinutes,
+    excludeFromHistory: true,
   })
 }
 
 function selectAvailableMinutes(option, message) {
   message.answered = true
   pendingRecommendation.value.availableMinutes = option.value
-  messages.value.push({ isUser: true, text: option.label })
+  messages.value.push({ isUser: true, text: option.label, excludeFromHistory: true })
   messages.value.push({
     isAi: true,
     text: '누구와 함께 하시나요?',
     quickReplies: COMPANION_OPTIONS,
     onSelect: selectCompanion,
+    excludeFromHistory: true,
   })
 }
 
 function selectCompanion(option, message) {
   message.answered = true
   pendingRecommendation.value.companion = option.value
-  messages.value.push({ isUser: true, text: option.label })
+  messages.value.push({ isUser: true, text: option.label, excludeFromHistory: true })
   messages.value.push({
     isAi: true,
     text: '어떤 분위기를 원하시나요?',
     quickReplies: MOOD_OPTIONS,
     onSelect: selectMood,
+    excludeFromHistory: true,
   })
 }
 
 function selectMood(option, message) {
   message.answered = true
   pendingRecommendation.value.mood = option.value
-  messages.value.push({ isUser: true, text: option.label })
+  messages.value.push({ isUser: true, text: option.label, excludeFromHistory: true })
   messages.value.push({
     isAi: true,
     text: '희망하는 지역이 있으신가요?',
     quickReplies: DISTRICT_OPTIONS,
     onSelect: selectDistrict,
+    excludeFromHistory: true,
   })
 }
 
 async function selectDistrict(option, message) {
   message.answered = true
   pendingRecommendation.value.district = option.value || undefined
-  messages.value.push({ isUser: true, text: option.label })
+  messages.value.push({ isUser: true, text: option.label, excludeFromHistory: true })
 
   const pending = pendingRecommendation.value
   pendingRecommendation.value = null
@@ -197,8 +216,8 @@ async function runChatQuery(message, context) {
   chatError.value = ''
 
   const history = messages.value
-    .slice(-8)
-    .filter((entry) => entry.isUser || entry.isAi)
+    .filter((entry) => (entry.isUser || entry.isAi) && !entry.excludeFromHistory)
+    .slice(-10)
     .map((entry) => ({ role: entry.isUser ? 'user' : 'assistant', content: entry.text }))
 
   try {
@@ -329,14 +348,18 @@ async function runChatQuery(message, context) {
       </div>
 
       <div class="chat-input-row">
-        <input
+        <textarea
+          ref="chatInputEl"
           v-model="chatInput"
-          type="text"
+          rows="1"
           placeholder="궁금한 걸 물어보세요"
+          :maxlength="CHAT_INPUT_MAX_LENGTH"
           @keydown="onChatKeyDown"
+          @input="autoResizeChatInput"
         />
         <button type="button" class="chat-send" @click="sendChatInput">➤</button>
       </div>
+      <div class="chat-input-counter">{{ chatInputCounter }}</div>
     </div>
   </div>
 </template>
