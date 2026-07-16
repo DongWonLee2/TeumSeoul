@@ -17,9 +17,14 @@ const props = defineProps({
 const emit = defineEmits(['open-place', 'bounds-change'])
 const mapElement = ref(null)
 const clusterEnabled = ref(true)
+const locating = ref(false)
+const locationVisible = ref(false)
+const locationError = ref('')
 const markerLayer = L.layerGroup()
+const currentLocationLayer = L.layerGroup()
 let clusterLayer
 let map
+let locationErrorTimer
 
 const mapStyle = computed(() => ({ minHeight: props.height }))
 const courseMode = computed(() => props.places.some((place) => place.courseOrder))
@@ -155,6 +160,73 @@ function focusPlace() {
   map.setView([place.latitude, place.longitude], Math.max(map.getZoom(), 16), { animate: true })
 }
 
+function showLocationError(message) {
+  locationError.value = message
+  window.clearTimeout(locationErrorTimer)
+  locationErrorTimer = window.setTimeout(() => {
+    locationError.value = ''
+  }, 4500)
+}
+
+function requestCurrentLocation() {
+  if (locating.value) return
+  if (!navigator.geolocation) {
+    showLocationError('이 브라우저에서는 현재 위치를 사용할 수 없어요.')
+    return
+  }
+
+  locating.value = true
+  locationError.value = ''
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => {
+      locating.value = false
+      if (!map) return
+      if (!Number.isFinite(coords.accuracy) || coords.accuracy > 1000) {
+        currentLocationLayer.clearLayers()
+        locationVisible.value = false
+        showLocationError('현재 위치가 너무 부정확해요. Wi-Fi 또는 기기의 위치 서비스를 확인해 주세요.')
+        return
+      }
+      const position = [coords.latitude, coords.longitude]
+      currentLocationLayer.clearLayers()
+      L.circle(position, {
+        radius: Math.max(coords.accuracy || 0, 20),
+        color: '#287ff0',
+        weight: 1,
+        opacity: 0.55,
+        fillColor: '#4c9cff',
+        fillOpacity: 0.13,
+        interactive: false,
+      }).addTo(currentLocationLayer)
+      L.marker(position, {
+        icon: L.divIcon({
+          className: 'current-location-marker-wrapper',
+          html: '<span class="current-location-halo"><span class="current-location-dot"></span></span>',
+          iconSize: [50, 50],
+          iconAnchor: [25, 25],
+        }),
+        interactive: true,
+        zIndexOffset: 1000,
+      })
+        .bindTooltip('현재 위치', { direction: 'top', offset: [0, -10] })
+        .addTo(currentLocationLayer)
+      locationVisible.value = true
+      map.setView(position, Math.max(map.getZoom(), 16), { animate: true })
+    },
+    (error) => {
+      locating.value = false
+      if (error.code === error.PERMISSION_DENIED) {
+        showLocationError('현재 위치를 보려면 브라우저의 위치 권한을 허용해 주세요.')
+      } else if (error.code === error.TIMEOUT) {
+        showLocationError('위치 확인 시간이 초과됐어요. 다시 시도해 주세요.')
+      } else {
+        showLocationError('현재 위치를 확인하지 못했어요.')
+      }
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+  )
+}
+
 onMounted(async () => {
   await nextTick()
   map = L.map(mapElement.value, { zoomControl: false }).setView([37.5665, 126.978], 12)
@@ -167,6 +239,7 @@ onMounted(async () => {
     showCoverageOnHover: false,
     maxClusterRadius: 52,
   })
+  currentLocationLayer.addTo(map)
   syncVisibleLayer()
   renderMarkers()
   map.on('moveend', emitBounds)
@@ -188,6 +261,7 @@ watch(() => props.focusRequest, async () => {
 })
 
 onBeforeUnmount(() => {
+  window.clearTimeout(locationErrorTimer)
   map?.remove()
   map = null
 })
@@ -196,6 +270,23 @@ onBeforeUnmount(() => {
 <template>
   <div class="map-frame" :style="mapStyle">
     <div ref="mapElement" class="leaflet-map" />
+    <button
+      type="button"
+      class="current-location-button"
+      :class="{ locating, active: locationVisible }"
+      :disabled="locating"
+      :aria-label="locating ? '현재 위치 확인 중' : '현재 위치 보기'"
+      :title="locating ? '현재 위치 확인 중' : '현재 위치 보기'"
+      @click="requestCurrentLocation"
+    >
+      <span v-if="locating" class="current-location-spinner" aria-hidden="true" />
+      <svg v-else viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+        <circle cx="12" cy="12" r="8" />
+      </svg>
+    </button>
+    <p v-if="locationError" class="current-location-error" role="status">{{ locationError }}</p>
     <div v-if="loading" class="map-loading" role="status">지도 장소를 불러오는 중…</div>
     <label v-if="!courseMode" class="cluster-toggle">
       <span>Cluster</span>

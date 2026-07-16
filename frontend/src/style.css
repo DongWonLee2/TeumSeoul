@@ -74,6 +74,24 @@ button:focus-visible, input:focus-visible { outline: 3px solid color-mix(in oklc
 .cluster-toggle input:checked + .toggle-track { background: var(--accent-2); }
 .cluster-toggle input:checked + .toggle-track span { transform: translateX(15px); }
 .cluster-toggle input:focus-visible + .toggle-track { outline: 3px solid color-mix(in oklch, var(--accent-2), transparent 68%); outline-offset: 2px; }
+.current-location-button { position: absolute; right: 13px; bottom: 104px; z-index: 500; display: grid; width: 30px; height: 30px; place-items: center; padding: 0; border: 1px solid rgb(0 0 0 / 18%); border-radius: 7px; background: rgb(255 255 255 / 96%); box-shadow: 0 1px 5px rgb(0 0 0 / 24%); color: oklch(42% .03 240); cursor: pointer; transition: color .18s, background .18s, transform .18s; }
+.current-location-button:hover { color: #287ff0; background: white; }
+.current-location-button:active { transform: scale(.95); }
+.current-location-button.active { color: #287ff0; }
+.current-location-button:disabled { cursor: wait; opacity: .78; }
+.current-location-button svg { width: 18px; height: 18px; overflow: visible; fill: none; stroke: currentColor; stroke-linecap: round; stroke-width: 1.8; }
+.current-location-button svg circle:first-child { fill: currentColor; stroke: none; }
+.current-location-spinner { width: 15px; height: 15px; border: 2px solid color-mix(in oklch, #287ff0, transparent 72%); border-top-color: #287ff0; border-radius: 50%; animation: current-location-spin .7s linear infinite; }
+.current-location-error { position: absolute; top: 16px; left: 50%; z-index: 600; width: max-content; max-width: min(440px, calc(100% - 120px)); margin: 0; padding: 10px 15px; border: 1px solid rgb(40 127 240 / 16%); border-radius: 999px; background: rgb(255 255 255 / 95%); box-shadow: 0 4px 16px rgb(24 66 124 / 16%); color: oklch(40% .07 240); font-size: 12px; line-height: 1.45; text-align: center; transform: translateX(-50%); animation: current-location-toast 4.5s ease both; backdrop-filter: blur(6px); pointer-events: none; }
+.current-location-marker-wrapper { background: none; border: 0; }
+.current-location-halo { position: relative; display: grid; width: 50px; height: 50px; place-items: center; border-radius: 50%; background: radial-gradient(circle, rgb(40 127 240 / 38%) 0 20%, rgb(72 151 255 / 24%) 35%, rgb(72 151 255 / 10%) 58%, transparent 74%); }
+.current-location-dot { display: block; width: 19px; height: 19px; border: 3px solid white; border-radius: 50%; background: #287ff0; box-shadow: 0 1px 5px rgb(19 73 150 / 48%); }
+@keyframes current-location-spin { to { transform: rotate(360deg); } }
+@keyframes current-location-toast {
+  0% { opacity: 0; transform: translate(-50%, -8px); }
+  10%, 82% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -5px); }
+}
 .teum-marker-wrapper { background: none; border: 0; }
 .teum-marker { display: block; width: 18px; height: 18px; border: 2px solid white; border-radius: 50% 50% 50% 0; box-shadow: 0 2px 6px rgb(0 0 0 / 28%); transform: rotate(-45deg); }
 .teum-course-marker-wrapper { background: none; border: 0; filter: drop-shadow(0 3px 4px rgb(0 0 0 / 25%)); }
