@@ -7,6 +7,7 @@ from app.services.location import (
     EXPECTED_LOCATION_COUNT,
     get_location_count,
     load_location_records,
+    remove_excluded_locations,
     seed_location_records,
 )
 
@@ -16,8 +17,11 @@ DEFAULT_DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "locations"
 def seed_locations(data_dir: Path = DEFAULT_DATA_DIR, *, force: bool = False) -> bool:
     init_db()
     with SessionLocal() as db:
+        removed_count = remove_excluded_locations(db)
         if not force and get_location_count(db) == EXPECTED_LOCATION_COUNT:
-            return False
+            if removed_count:
+                db.commit()
+            return bool(removed_count)
 
         records = load_location_records(data_dir)
         seed_location_records(db, records)
@@ -37,12 +41,12 @@ def main() -> None:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="6,518건이 있어도 원본으로 갱신합니다.",
+        help="6,517건이 있어도 원본으로 갱신합니다.",
     )
     args = parser.parse_args()
 
     seeded = seed_locations(args.data_dir, force=args.force)
-    print("장소 6,518건 적재 완료" if seeded else "장소 6,518건이 이미 있어 건너뜀")
+    print("장소 6,517건 적재 완료" if seeded else "장소 6,517건이 이미 있어 건너뜀")
 
 
 if __name__ == "__main__":

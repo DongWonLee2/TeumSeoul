@@ -17,7 +17,7 @@ router = APIRouter(prefix="/locations", tags=["장소"])
     response_model=DataResponse[list[LocationSummary]],
     summary="장소 목록 조회",
     description=(
-        "서울 장소 6,518건을 검색합니다. 키워드·콘텐츠 유형·자치구·이미지 유무·"
+        "서울 장소 6,517건을 검색합니다. 키워드·콘텐츠 유형·자치구·이미지 유무·"
         "원천 데이터 갱신연도를 조합해 필터링할 수 있습니다."
     ),
     responses={422: {"description": "쿼리 파라미터가 허용 범위를 벗어남"}},
