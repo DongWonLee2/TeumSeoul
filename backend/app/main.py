@@ -13,7 +13,7 @@ from app.db.init_db import init_db
 from app.db.session import SessionLocal
 from app.schemas.common import ErrorResponse
 from app.services.location import seed_locations_if_needed
-from app.services.post_seed import seed_posts_if_needed
+from app.services.post_seed import normalize_existing_post_contracts, seed_posts_if_needed
 
 LOCATION_DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "locations"
 POST_DATA_PATH = Path(__file__).resolve().parents[1] / "data" / "posts" / "community_seed.json"
@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     init_db()
     with SessionLocal() as db:
         seed_locations_if_needed(db, LOCATION_DATA_DIR)
+        normalize_existing_post_contracts(db)
         seed_posts_if_needed(db, POST_DATA_PATH)
     yield
 

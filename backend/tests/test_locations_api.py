@@ -142,7 +142,7 @@ def test_created_post_is_exposed_in_location_detail(client: TestClient) -> None:
             json={
                 "location_id": 3,
                 "category": "방문 후기",
-                "status_tag": "여유" if index == 6 else None,
+                "status_tag": "가족 추천" if index == 6 else None,
                 "title": f"강남 쇼핑센터 방문 후기 {index}",
                 "content": f"장소 상세 관련 게시글 연동 확인 {index}",
                 "password": "1234",
@@ -164,7 +164,7 @@ def test_created_post_is_exposed_in_location_detail(client: TestClient) -> None:
         "id": created_posts[5]["id"],
         "title": "강남 쇼핑센터 방문 후기 6",
         "category": "방문 후기",
-        "status_tag": "여유",
+        "status_tag": "가족 추천",
         "created_at": created_posts[5]["created_at"],
     }
 

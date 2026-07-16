@@ -113,8 +113,8 @@ def test_post_crud_search_views_and_password_is_never_exposed(post_api) -> None:
 
     free_post_payload = {
         **create_payload(None),
-        "category": "질문",
-        "status_tag": None,
+        "category": "방문 후기",
+        "status_tag": "혼자 추천",
         "title": "장소 없는 자유 질문",
         "content": "서울 나들이 장소가 궁금합니다.",
     }
@@ -140,7 +140,7 @@ def test_post_crud_search_views_and_password_is_never_exposed(post_api) -> None:
         **create_payload(None),
         "password": "1234",
         "category": "방문 후기",
-        "status_tag": "여유",
+        "status_tag": "혼자 추천",
         "title": "평일 오전 후기",
         "content": "평일 오전에는 비교적 여유로웠습니다.",
     }
@@ -180,6 +180,20 @@ def test_post_validation_and_missing_resources(post_api) -> None:
     invalid_filter = client.get("/api/posts", params={"status_tag": "잘못된 값"})
     assert invalid_filter.status_code == 422
     assert invalid_filter.json()["code"] == "INVALID_QUERY_PARAMETER"
+
+    invalid_combination = client.post(
+        "/api/posts",
+        json={**create_payload(), "status_tag": "사진 추천"},
+    )
+    assert invalid_combination.status_code == 422
+    assert invalid_combination.json()["code"] == "INVALID_POST_INPUT"
+
+    invalid_filter_combination = client.get(
+        "/api/posts",
+        params={"category": "방문 후기", "status_tag": "혼잡"},
+    )
+    assert invalid_filter_combination.status_code == 422
+    assert invalid_filter_combination.json()["code"] == "INVALID_QUERY_PARAMETER"
 
     missing_post = client.put("/api/posts/9999", json=create_payload())
     assert missing_post.status_code == 404
@@ -230,7 +244,7 @@ def test_post_schema_matches_erd_and_location_delete_sets_null() -> None:
         location = add_location(db, title="삭제 관계 검증 장소")
         post = Post(
             location_id=location.id,
-            category="질문",
+            category="방문 후기",
             title="관계 검증 게시글",
             content="장소 삭제 후 자유글로 유지되어야 합니다.",
             password="1234",
@@ -271,7 +285,7 @@ def test_post_only_reads_public_location_columns() -> None:
 
     payload = PostCreate(
         location_id=1,
-        category="질문",
+        category="방문 후기",
         title="공개 컬럼 조회 검증",
         content="Location 내부 스키마에 결합되지 않아야 합니다.",
         password="1234",
